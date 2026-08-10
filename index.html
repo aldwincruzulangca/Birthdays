@@ -143,17 +143,30 @@
     margin: 0 0 8px;
   }
   h1.headline {
+    position: relative;
     font-family: 'Estre Script', cursive;
     font-weight: 700;
     font-size: clamp(42px, 13vw, 58px);
     line-height: 1.15;
-    color: var(--ink-green);
     margin: 0 0 8px;
     text-wrap: balance;
+    color: var(--ink-green);
+    background: linear-gradient(90deg, #e8264f, #f2762b, #f6b23e, #4caf6f, #2f8fd1, #9b5de5, #e8264f);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
     text-shadow:
-      0 0 10px rgba(224, 179, 100, 0.65),
-      0 0 22px rgba(240, 160, 184, 0.5),
-      0 0 38px rgba(164, 205, 236, 0.35);
+      1px 1px 0 rgba(50, 36, 20, 0.28),
+      2px 2.5px 0 rgba(50, 36, 20, 0.22),
+      3px 4px 0 rgba(50, 36, 20, 0.16);
+  }
+  h1.headline::before {
+    content: '';
+    position: absolute;
+    inset: -36% -12% -20%;
+    background: radial-gradient(ellipse at center, rgba(240, 160, 184, 0.5) 0%, rgba(164, 205, 236, 0.32) 48%, transparent 72%);
+    filter: blur(22px);
+    z-index: -1;
   }
   .full-name {
     font-size: 13.5px;
@@ -162,7 +175,30 @@
   }
 
   /* ---- Photo ---- */
-  .photo-wrap { position: relative; width: clamp(220px, 78vw, 336px); height: clamp(220px, 78vw, 336px); margin: 0 auto 30px; }
+  .photo-wrap {
+    position: relative;
+    width: clamp(220px, 78vw, 336px); height: clamp(220px, 78vw, 336px);
+    margin: 0 auto 30px;
+    animation: photoBounce 3.4s ease-in-out infinite;
+  }
+  .photo-wrap::before {
+    content: '';
+    position: absolute;
+    inset: -14%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(240, 160, 184, 0.55) 0%, rgba(164, 205, 236, 0.38) 50%, transparent 74%);
+    filter: blur(20px);
+    z-index: -1;
+    animation: glowThrob 2.6s ease-in-out infinite;
+  }
+  @keyframes photoBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes glowThrob {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 0.95; transform: scale(1.15); }
+  }
   .photo-ring {
     width: 100%; height: 100%; border-radius: 50%;
     background: #fff; padding: 10px;
@@ -438,17 +474,18 @@
   }
   .cam-close {
     position: absolute; top: max(16px, env(safe-area-inset-top)); right: 16px;
-    width: 40px; height: 40px; border-radius: 50%;
+    width: 20px; height: 20px; border-radius: 50%;
     background: rgba(255,255,255,0.14); border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    color: #fff; z-index: 5; backdrop-filter: blur(6px);
+    color: #fff; z-index: 55; backdrop-filter: blur(6px);
   }
+  .cam-close svg { width: 45%; height: 45%; }
   .cam-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
   .cam-modal-inner {
     width: 100%; height: 100%;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: calc(64px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+    padding: calc(38px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
     box-sizing: border-box;
     gap: 14px;
   }
@@ -474,8 +511,8 @@
     box-shadow: 0 12px 34px rgba(0,0,0,0.55);
     touch-action: none;
   }
-  .cam-frame-wrap[data-orientation="portrait"] { aspect-ratio: 3 / 4; max-height: 62vh; }
-  .cam-frame-wrap[data-orientation="landscape"] { aspect-ratio: 4 / 3; max-width: 640px; max-height: 52vh; }
+  .cam-frame-wrap[data-orientation="portrait"] { aspect-ratio: 3 / 4; max-height: 86vh; }
+  .cam-frame-wrap[data-orientation="landscape"] { aspect-ratio: 4 / 3; max-width: 640px; max-height: 68vh; }
 
   .cam-frame-wrap video,
   .cam-frame-wrap canvas {
@@ -514,6 +551,17 @@
   .sticker-thumb:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
   .cam-hint { font-size: 11px; color: rgba(255,255,255,0.6); margin: 0; text-align: center; }
+
+  /* Live-camera controls float over the video itself (never part of the captured
+     photo — the capture routine only ever draws the video/frame/stickers/text to
+     canvas, these are DOM-only chrome) so the frame can use nearly the full modal. */
+  .cam-controls-overlay {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center; gap: 22px;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
+    z-index: 50;
+  }
 
   .cam-controls {
     display: flex; align-items: center; justify-content: center; gap: 22px;
@@ -651,7 +699,7 @@
   }
   .qr-box svg { width: 128px; height: 128px; display: block; }
 
-  /* ---- Bottom nav: floating opaque pill with glowing icons ---- */
+  /* ---- Bottom nav: frozen-glass pill, icons glow instead of framing on tap ---- */
   nav.tabbar {
     position: fixed;
     left: 50%;
@@ -659,12 +707,14 @@
     transform: translateX(-50%);
     display: flex;
     gap: 2px;
-    background: #fffdf8;
+    background: rgba(255, 253, 248, 0.38);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
     border-radius: 999px;
     padding: 8px;
     width: max-content;
     max-width: calc(100% - 32px);
-    box-shadow: 0 10px 30px rgba(70, 55, 90, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+    box-shadow: 0 10px 30px rgba(70, 55, 90, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.45) inset;
     z-index: 10;
   }
   nav.tabbar a {
@@ -672,20 +722,22 @@
     text-decoration: none; color: var(--ink-soft);
     font-size: 10.5px; font-weight: 700;
     padding: 8px 18px; border-radius: 999px;
+    background: none;
   }
   nav.tabbar a svg {
     width: 19px; height: 19px;
     filter: drop-shadow(0 0 3px rgba(181, 130, 47, 0.55));
     transition: filter 0.2s ease;
   }
-  nav.tabbar a.active { color: var(--c-heart); background: var(--p1-tint); }
+  nav.tabbar a.active { color: var(--c-heart); }
   nav.tabbar a.active svg {
-    filter: drop-shadow(0 0 5px rgba(217, 87, 122, 0.8)) drop-shadow(0 0 11px rgba(217, 87, 122, 0.5));
+    filter: drop-shadow(0 0 6px rgba(217, 87, 122, 0.9)) drop-shadow(0 0 13px rgba(217, 87, 122, 0.6));
   }
   nav.tabbar a:focus-visible { outline: 2px solid var(--c-pin); outline-offset: 2px; }
 
   @media (prefers-reduced-motion: reduce) {
     .slide { transition: none; }
+    .photo-wrap, .photo-wrap::before { animation: none; }
   }
 </style>
 
@@ -741,25 +793,7 @@
       </div>
     </div>
 
-    <div class="program-card" style="margin-bottom: 26px;">
-      <div class="sub-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <h2>Program</h2>
-      </div>
-      <div class="timeline">
-        <div class="tl-item"><p class="tl-time">11:00 AM</p><p class="tl-what">Guest Arrival &amp; Registration</p></div>
-        <div class="tl-item"><p class="tl-time">11:30 AM</p><p class="tl-what">Opening Prayer &amp; Welcome</p></div>
-        <div class="tl-item"><p class="tl-time">12:00 NN</p><p class="tl-what">Lunch</p></div>
-        <div class="tl-item"><p class="tl-time">1:00 PM</p><p class="tl-what">Cake Cutting &amp; Blessing for EMA</p></div>
-        <div class="tl-item"><p class="tl-time">1:30 PM</p><p class="tl-what">Games &amp; Mini Program</p></div>
-        <div class="tl-item"><p class="tl-time">2:15 PM</p><p class="tl-what">Pabitin &amp; Party Favors</p></div>
-        <div class="tl-item"><p class="tl-time">2:45 PM</p><p class="tl-what">Thank You &amp; Closing Remarks</p></div>
-        <div class="tl-item"><p class="tl-time">3:00 PM</p><p class="tl-what">End of Celebration</p></div>
-      </div>
-      <p class="program-note">Suggested flow &mdash; tell KD the real order of activities and this updates to match.</p>
-    </div>
-
-    <div class="rsvp-card">
+    <div class="rsvp-card" style="margin-bottom: 26px;">
       <div class="rsvp-admin-list" id="rsvpAdminList" hidden>
         <p class="rsvp-admin-total" id="rsvpTotal">0 guests attending</p>
         <div class="rsvp-admin-rows" id="rsvpRows"></div>
@@ -815,6 +849,24 @@
         </div>
         <p class="rsvp-note" id="rsvpEditMsg"></p>
       </div>
+    </div>
+
+    <div class="program-card">
+      <div class="sub-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <h2>Program</h2>
+      </div>
+      <div class="timeline">
+        <div class="tl-item"><p class="tl-time">11:00 AM</p><p class="tl-what">Guest Arrival &amp; Registration</p></div>
+        <div class="tl-item"><p class="tl-time">11:30 AM</p><p class="tl-what">Opening Prayer &amp; Welcome</p></div>
+        <div class="tl-item"><p class="tl-time">12:00 NN</p><p class="tl-what">Lunch</p></div>
+        <div class="tl-item"><p class="tl-time">1:00 PM</p><p class="tl-what">Cake Cutting &amp; Blessing for EMA</p></div>
+        <div class="tl-item"><p class="tl-time">1:30 PM</p><p class="tl-what">Games &amp; Mini Program</p></div>
+        <div class="tl-item"><p class="tl-time">2:15 PM</p><p class="tl-what">Pabitin &amp; Party Favors</p></div>
+        <div class="tl-item"><p class="tl-time">2:45 PM</p><p class="tl-what">Thank You &amp; Closing Remarks</p></div>
+        <div class="tl-item"><p class="tl-time">3:00 PM</p><p class="tl-what">End of Celebration</p></div>
+      </div>
+      <p class="program-note">Suggested flow &mdash; tell KD the real order of activities and this updates to match.</p>
     </div>
 
   </section>
@@ -914,19 +966,18 @@
         <div class="cam-frame-wrap" id="camFrameWrap" data-orientation="portrait">
           <video id="camVideo" autoplay playsinline muted></video>
           <img class="cam-frame-overlay" id="camFrameImg" alt="" aria-hidden="true">
+          <div class="cam-controls-overlay">
+            <button type="button" class="cam-icon-btn" id="camOrientBtn" aria-label="Switch portrait/landscape">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"/></svg>
+            </button>
+            <button type="button" class="shutter-btn" id="camShutterBtn" aria-label="Take photo"></button>
+            <button type="button" class="cam-icon-btn" id="camFlipBtn" aria-label="Flip camera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1 21 6l-4 3.9"/><path d="M3 12.5v-1a4 4 0 0 1 4-4h14"/><path d="M7 21.9 3 18l4-3.9"/><path d="M21 11.5v1a4 4 0 0 1-4 4H3"/></svg>
+            </button>
+          </div>
         </div>
         <div class="sticker-tray" id="stickerTray"></div>
         <p class="cam-hint">Tap a sticker to add it &mdash; drag to move, pinch to resize &amp; rotate</p>
-        <div class="cam-controls">
-          <button type="button" class="cam-icon-btn" id="camOrientBtn" aria-label="Switch portrait/landscape">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"/></svg>
-          </button>
-          <button type="button" class="cam-icon-btn" id="camFlipBtn" aria-label="Flip camera">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1 21 6l-4 3.9"/><path d="M3 12.5v-1a4 4 0 0 1 4-4h14"/><path d="M7 21.9 3 18l4-3.9"/><path d="M21 11.5v1a4 4 0 0 1-4 4H3"/></svg>
-          </button>
-          <button type="button" class="shutter-btn" id="camShutterBtn" aria-label="Take photo"></button>
-          <span style="width: 46px;"></span>
-        </div>
       </div>
 
       <div class="cam-preview" id="camPreview" hidden>
