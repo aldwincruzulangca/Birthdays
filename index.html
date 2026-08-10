@@ -573,7 +573,19 @@
 
   footer.sig { text-align: center; padding: 26px 20px 0; font-size: 11.5px; color: var(--ink-soft); }
 
-  /* ---- Wishes / guestbook (revealed on the celebration day) ---- */
+  /* ---- Wishes / guestbook (revealed by the admin celebration switch) ---- */
+  .celeb-admin {
+    background: var(--lav-tint, #e7e5f5);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 18px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .celeb-admin-status { font-size: 11.5px; color: var(--ink-soft); margin: 0; flex: 1; }
+  .celeb-admin-status.ok { color: var(--c-pin); font-weight: 700; }
+  .celeb-admin-status.err { color: var(--c-heart); }
+  .celeb-admin .pillbtn { flex: none; }
+
   .wishes-card {
     background: var(--card-solid);
     border-radius: 22px;
@@ -944,6 +956,10 @@
   </section>
 
   <section class="wishes-card" id="wishesCard" hidden>
+    <div class="celeb-admin" id="celebAdmin" hidden>
+      <p class="celeb-admin-status" id="celebStatus"></p>
+      <button type="button" class="pillbtn p3" id="celebToggleBtn">Make Public</button>
+    </div>
     <div class="sub-head">
       <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3v4l5-4h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/></svg>
       <h2>Leave a Wish or Message</h2>
@@ -3426,7 +3442,7 @@ var qrcode = function() {
     });
   }
 
-  var manifest = { months: {}, photobooth: [], rsvps: [], wishes: [] };
+  var manifest = { months: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false };
 
   function persistManifest() {
     var record = {
@@ -3435,7 +3451,8 @@ var qrcode = function() {
         .map(function (s) { return { slug: s, url: manifest.months[s] }; }),
       photobooth: manifest.photobooth,
       rsvps: manifest.rsvps,
-      wishes: manifest.wishes
+      wishes: manifest.wishes,
+      celebrationLive: manifest.celebrationLive
     };
     return fetch('https://api.jsonbin.io/v3/b/' + GALLERY_CONFIG.jsonbinId, {
       method: 'PUT',
@@ -3479,10 +3496,11 @@ var qrcode = function() {
   function revealAdminExtras() {
     rsvpAdminList.hidden = false;
     renderRsvpAdmin();
+    applyCelebrationState();
   }
 
   function loadManifest() {
-    if (!isConfigured()) { renderPhotoboothGrid(); renderWishThread(); return; }
+    if (!isConfigured()) { renderPhotoboothGrid(); renderWishThread(); applyCelebrationState(); return; }
     fetch('https://api.jsonbin.io/v3/b/' + GALLERY_CONFIG.jsonbinId + '/latest', {
       headers: { 'X-Master-Key': GALLERY_CONFIG.jsonbinKey }
     })
@@ -3500,12 +3518,14 @@ var qrcode = function() {
         manifest.photobooth = (record && Array.isArray(record.photobooth)) ? record.photobooth : [];
         manifest.rsvps = (record && Array.isArray(record.rsvps)) ? record.rsvps : [];
         manifest.wishes = (record && Array.isArray(record.wishes)) ? record.wishes : [];
+        manifest.celebrationLive = !!(record && record.celebrationLive);
         renderPhotoboothGrid();
         renderWishThread();
+        applyCelebrationState();
         if (sessionStorage.getItem('emaGalleryAdmin') === '1') { revealAdminExtras(); }
         flushQueue();
       })
-      .catch(function () { renderPhotoboothGrid(); renderWishThread(); });
+      .catch(function () { renderPhotoboothGrid(); renderWishThread(); applyCelebrationState(); });
   }
   // Called at the very end of this script, once every DOM reference below is set up.
 
@@ -4210,20 +4230,58 @@ var qrcode = function() {
     document.getElementById('qrCode').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2 });
   } catch (e) { /* qr box just stays empty */ }
 
-  /* ---- Celebration-day switch: thank-you note + guestbook, live from Oct 11 2026 ---- */
-  function isOnOrAfterCelebration() {
-    var now = new Date();
-    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    var celebrationDay = new Date(2026, 9, 11);
-    return today.getTime() >= celebrationDay.getTime();
+  /* ---- Celebration switch: admin-controlled, no auto date/timer ---- */
+  var celebAdmin = document.getElementById('celebAdmin');
+  var celebStatus = document.getElementById('celebStatus');
+  var celebToggleBtn = document.getElementById('celebToggleBtn');
+  var wishesCardEl = document.getElementById('wishesCard');
+  var closingHeadlineEl = document.getElementById('closingHeadline');
+  var closingBodyEl = document.getElementById('closingBody');
+
+  var DEFAULT_CLOSING_HEADLINE = "We can't wait to celebrate!";
+  var DEFAULT_CLOSING_BODY = "Don't forget to bring your magical energy.";
+  var THANKYOU_HEADLINE = 'Thank You!';
+  var THANKYOU_BODY = 'Thank You for giving precious time to celebrate this special Day of our EMA and family! I hope you enjoy the food and party!';
+
+  function isAdminUnlocked() {
+    return sessionStorage.getItem('emaGalleryAdmin') === '1';
   }
 
-  if (isOnOrAfterCelebration()) {
-    document.getElementById('closingHeadline').textContent = 'Thank You!';
-    document.getElementById('closingBody').textContent =
-      'Thank You for giving precious time to celebrate this special Day of our EMA and family! I hope you enjoy the food and party!';
-    document.getElementById('wishesCard').hidden = false;
+  function applyCelebrationState() {
+    var isLive = manifest.celebrationLive === true;
+    var showContent = isLive || isAdminUnlocked();
+
+    closingHeadlineEl.textContent = showContent ? THANKYOU_HEADLINE : DEFAULT_CLOSING_HEADLINE;
+    closingBodyEl.textContent = showContent ? THANKYOU_BODY : DEFAULT_CLOSING_BODY;
+    wishesCardEl.hidden = !showContent;
+
+    if (isAdminUnlocked()) {
+      celebAdmin.hidden = false;
+      celebStatus.textContent = isLive
+        ? '🌍 Live — visible to everyone'
+        : '🔒 Preview only — you\'re seeing this because you\'re logged in as admin. Guests don\'t see it yet.';
+      celebStatus.className = 'celeb-admin-status' + (isLive ? ' ok' : '');
+      celebToggleBtn.textContent = isLive ? 'Take Offline' : 'Make Public';
+    } else {
+      celebAdmin.hidden = true;
+    }
   }
+
+  celebToggleBtn.addEventListener('click', function () {
+    manifest.celebrationLive = !manifest.celebrationLive;
+    applyCelebrationState();
+    if (isConfigured()) {
+      celebStatus.textContent = 'Saving…';
+      persistManifest()
+        .then(applyCelebrationState)
+        .catch(function () {
+          celebStatus.textContent = 'Changed here, but couldn’t reach the shared list — try again.';
+          celebStatus.className = 'celeb-admin-status err';
+        });
+    }
+  });
+
+  applyCelebrationState();
 
   /* ---- Wishes / guestbook ---- */
   var EMOJI_SET = ['🎉','🎂','🎈','🥳','❤️','😍','👶','🌈','🦄','✨','🥰','😊','👏','🙏','💕','🎁','😄','🍰','🌟','😇','🧸','🍼','💐','🎊'];
