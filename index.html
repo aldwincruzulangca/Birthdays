@@ -381,6 +381,7 @@
     background: #fff;
     box-shadow: 0 10px 26px var(--shadow);
     margin-bottom: 14px;
+    transition: aspect-ratio 0.35s ease;
   }
   .slide {
     position: absolute; inset: 0;
@@ -389,7 +390,7 @@
     text-align: center;
   }
   .slide.active { opacity: 1; z-index: 1; }
-  .slide img { width: 100%; height: 100%; object-fit: cover; }
+  .slide img { width: 100%; height: 100%; object-fit: contain; background: #000; }
   .slide .placeholder-num {
     font-family: 'Baloo Deco', sans-serif; font-weight: 800;
     font-size: 46px; color: #fff; text-shadow: 0 3px 10px var(--shadow);
@@ -3515,6 +3516,12 @@ var qrcode = function() {
     tiles.push(tile);
   });
 
+  var slidePhotoRatio = {};
+
+  function updateSlideshowAspect() {
+    slideshow.style.aspectRatio = slidePhotoRatio[current] || '4 / 3';
+  }
+
   function setSlidePhoto(i, url) {
     var slide = slides[i];
     var tile = tiles[i];
@@ -3523,6 +3530,14 @@ var qrcode = function() {
     slide.innerHTML = '<img src="' + url + '" alt="EMA, ' + MONTHS[i] + '">';
     tile.style.background = '#000';
     tile.innerHTML = '<img src="' + url + '" alt="EMA, ' + MONTHS[i] + '">';
+    var probe = new Image();
+    probe.onload = function () {
+      if (probe.naturalWidth && probe.naturalHeight) {
+        slidePhotoRatio[i] = probe.naturalWidth + ' / ' + probe.naturalHeight;
+        if (i === current) updateSlideshowAspect();
+      }
+    };
+    probe.src = url;
   }
 
   var dots = Array.from(dotsWrap.children);
@@ -3533,6 +3548,7 @@ var qrcode = function() {
     current = (i + slides.length) % slides.length;
     slides[current].classList.add('active');
     dots[current].setAttribute('aria-current', 'true');
+    updateSlideshowAspect();
   }
 
   document.getElementById('ssPrev').addEventListener('click', function () { goTo(current - 1); resetAutoplay(); });
