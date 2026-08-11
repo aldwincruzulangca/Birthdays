@@ -956,40 +956,37 @@
     .album-modal-grid { grid-template-columns: repeat(4, 1fr); }
   }
 
-  /* ---- Desktop/web view: left sidebar nav + a wider, multi-column layout.
-     Placed last so it wins the cascade over the 481px "centered phone card"
-     rules for the properties it overrides (same theme, just reflowed). ---- */
+  /* ---- Desktop/web view: floating icon-only nav pill on the right + a wider,
+     multi-column layout. Placed last so it wins the cascade over the 481px
+     "centered phone card" rules for the properties it overrides. ---- */
   @media (min-width: 1000px) {
     body { display: block; }
     .app-shell {
       max-width: none;
       width: 100%;
-      padding-left: 232px;
       padding-bottom: 60px;
       box-shadow: none;
     }
 
     nav.tabbar {
-      left: 0; right: auto; bottom: 0; top: 0;
-      transform: none;
-      width: 208px; max-width: none;
-      height: auto;
-      flex-direction: column; align-items: stretch; justify-content: flex-start;
-      gap: 4px;
-      padding: 36px 14px;
-      border-radius: 0;
-      background: rgba(255, 253, 248, 0.9);
-      box-shadow: 4px 0 28px rgba(70, 55, 90, 0.14), 1px 0 0 rgba(0,0,0,0.05);
-      overflow-y: auto;
+      left: auto; right: 22px; bottom: auto; top: 50%;
+      transform: translateY(-50%);
+      width: auto; max-width: none; height: auto;
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px;
+      padding: 10px;
+      border-radius: 999px;
+      background: rgba(255, 253, 248, 0.75);
+      box-shadow: 0 10px 30px rgba(70, 55, 90, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.45) inset;
     }
     nav.tabbar a {
-      flex-direction: row; justify-content: flex-start; gap: 12px;
-      font-size: 13.5px;
-      padding: 12px 16px;
-      border-radius: 14px;
+      flex-direction: row; justify-content: center; align-items: center;
+      font-size: 0;
+      width: 40px; height: 40px; padding: 0;
+      border-radius: 50%;
     }
-    nav.tabbar a.active { background: rgba(217, 87, 122, 0.1); }
-    nav.tabbar a svg { width: 20px; height: 20px; }
+    nav.tabbar a.active { background: rgba(217, 87, 122, 0.14); }
+    nav.tabbar a svg { width: 19px; height: 19px; }
 
     .wrap {
       max-width: 1000px;
