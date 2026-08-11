@@ -158,7 +158,7 @@
     -webkit-text-fill-color: transparent;
   }
   h1.headline::after {
-    content: 'EMA is turning One';
+    content: attr(data-after-text);
     position: absolute;
     inset: 0;
     color: #fff;
@@ -810,6 +810,37 @@
     box-shadow: 0 8px 20px var(--shadow); line-height: 0;
   }
   .qr-box svg { width: 128px; height: 128px; display: block; }
+  .qr-contact-note {
+    font-size: 10.5px; color: var(--ink-soft); line-height: 1.5;
+    max-width: 320px; margin: 14px auto 0;
+  }
+
+  /* ---- Background music widget: same toggle+slider pattern as the
+     Winfinity adventure page, scaled way down (small icon-only footprint
+     rather than a full standalone panel) since this is a light amenity, not
+     a page feature. ---- */
+  .music-widget {
+    position: fixed; top: max(14px, env(safe-area-inset-top)); left: 14px;
+    z-index: 55; display: flex; flex-direction: column; align-items: center;
+    gap: 6px;
+  }
+  .music-toggle {
+    width: 22px; height: 22px; border-radius: 50%; border: none;
+    background: rgba(255, 253, 248, 0.75); color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(70, 55, 90, 0.18);
+  }
+  .music-toggle svg { width: 11px; height: 11px; }
+  .music-toggle.is-muted { color: var(--ink-soft); opacity: 0.6; }
+  .music-toggle:focus-visible { outline: 2px solid var(--c-pin); outline-offset: 2px; }
+  .music-volume-panel {
+    background: rgba(255, 253, 248, 0.75); border-radius: 8px;
+    padding: 6px 3px; box-shadow: 0 4px 12px rgba(70, 55, 90, 0.18);
+  }
+  .music-volume-panel input[type="range"] {
+    writing-mode: vertical-lr; direction: rtl;
+    width: 3px; height: 40px; accent-color: var(--c-pin); cursor: pointer;
+  }
 
   /* ---- Bottom nav: frozen-glass pill, icons glow instead of framing on tap ---- */
   nav.tabbar {
@@ -1058,7 +1089,7 @@
   <div class="intro">
     <p class="eyebrow">Join us for a magical day!</p>
     <div class="headline-sparkle-wrap">
-      <h1 class="headline">EMA is turning One</h1>
+      <h1 class="headline" id="headlineText" data-after-text="EMA is turning One">EMA is turning One</h1>
       <span class="sparkle" style="left: 4%; top: -8%; font-size: 13px; animation-delay: 0s; animation-duration: 2.3s;">✦</span>
       <span class="sparkle" style="left: 90%; top: 0%; font-size: 11px; animation-delay: 0.5s; animation-duration: 2.6s;">✦</span>
       <span class="sparkle" style="left: 14%; top: 42%; font-size: 10px; animation-delay: 1.1s; animation-duration: 2.1s;">✦</span>
@@ -1420,6 +1451,18 @@
     </div>
   </div>
 
+  <audio id="bgMusic" loop preload="none">
+    <source src="https://res.cloudinary.com/coyw7r0r/video/upload/v1786431741/ema-first-birthday/audio/ema-rainbow-bgmusic.mp3" type="audio/mpeg">
+  </audio>
+  <div class="music-widget" id="musicWidget">
+    <button type="button" class="music-toggle" id="musicToggle" aria-label="Mute background music" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+    </button>
+    <div class="music-volume-panel">
+      <input type="range" id="musicVolumeSlider" min="0" max="100" value="45" aria-label="Music volume">
+    </div>
+  </div>
+
   <section class="closing-card">
     <button type="button" class="share-btn" id="shareBtn" aria-label="Share this invitation">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>
@@ -1478,6 +1521,7 @@
   <section class="qr-card">
     <p class="qr-label">Scan to open on another phone</p>
     <div class="qr-box" id="qrCode"></div>
+    <p class="qr-contact-note">Contact mobile: 09762373212 / 09143703821 &middot; email: aldwincruzulangca@gmail.com if you wish to acquire the same Occasion Digital Invitation.</p>
   </section>
 
   <footer class="sig">This invitation is up through October 11, 2027.</footer>
@@ -3807,6 +3851,84 @@ var qrcode = function() {
   var MONTH_SLUGS = ["birth","month-01","month-02","month-03","month-04","month-05","month-06","month-07","month-08","month-09","month-10","month-11"];
   var HUES = ["rose","peach","butter","mint","sky","lilac"];
 
+  var TURNED_ONE_SWITCH = new Date('2026-10-08T00:00:00').getTime();
+  function headlinePhrase(withBang) {
+    var turned = Date.now() >= TURNED_ONE_SWITCH;
+    var phrase = turned ? 'Ema just turned One' : 'EMA is turning One';
+    return withBang ? phrase + '!' : phrase;
+  }
+  (function () {
+    var el = document.getElementById('headlineText');
+    var phrase = headlinePhrase(false);
+    el.textContent = phrase;
+    el.setAttribute('data-after-text', phrase);
+  })();
+
+  /* ---- Background music: same toggle+slider pattern used on the Winfinity
+     adventure page. Starts on first user interaction (autoplay-with-sound is
+     blocked until then), volume/mute persist across visits. ---- */
+  (function () {
+    var audio = document.getElementById('bgMusic');
+    var toggle = document.getElementById('musicToggle');
+    var slider = document.getElementById('musicVolumeSlider');
+    var VOL_KEY = 'emaMusicVolume';
+    var MUTED_KEY = 'emaMusicMuted';
+
+    var ICON_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+    var ICON_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+
+    var savedVolume = parseInt(localStorage.getItem(VOL_KEY), 10);
+    if (isNaN(savedVolume)) savedVolume = 45;
+    var muted = localStorage.getItem(MUTED_KEY) === '1';
+
+    slider.value = savedVolume;
+    audio.volume = savedVolume / 100;
+    audio.muted = muted;
+
+    function updateToggleUI() {
+      toggle.innerHTML = muted ? ICON_OFF : ICON_ON;
+      toggle.classList.toggle('is-muted', muted);
+      toggle.setAttribute('aria-pressed', String(muted));
+      toggle.setAttribute('aria-label', muted ? 'Unmute background music' : 'Mute background music');
+    }
+    updateToggleUI();
+
+    function play() { audio.play().catch(function () {}); }
+
+    var started = false;
+    function tryStart() {
+      if (started) return;
+      started = true;
+      audio.load();
+      if (!muted) play();
+    }
+    ['pointerdown', 'keydown', 'touchstart'].forEach(function (evt) {
+      document.addEventListener(evt, tryStart, { once: true, passive: true });
+    });
+
+    toggle.addEventListener('click', function () {
+      muted = !muted;
+      localStorage.setItem(MUTED_KEY, muted ? '1' : '0');
+      audio.muted = muted;
+      updateToggleUI();
+      if (!muted) { tryStart(); play(); }
+    });
+
+    slider.addEventListener('input', function () {
+      var v = parseInt(slider.value, 10);
+      localStorage.setItem(VOL_KEY, String(v));
+      audio.volume = v / 100;
+      if (v > 0 && muted) {
+        muted = false;
+        localStorage.setItem(MUTED_KEY, '0');
+        audio.muted = false;
+        updateToggleUI();
+        tryStart();
+        play();
+      }
+    });
+  })();
+
   var slideshow = document.getElementById('slideshow');
   var dotsWrap = document.getElementById('ssDots');
   var grid = document.getElementById('galleryGrid');
@@ -4751,7 +4873,7 @@ var qrcode = function() {
   var shareNote = document.getElementById('shareNote');
   shareBtn.addEventListener('click', function () {
     var shareData = {
-      title: 'EMA is turning One!',
+      title: headlinePhrase(true),
       text: "Join us for EMA's (Estre Myria Asce) first birthday — Oct 11, 2026, Limay Multipurpose Hall.",
       url: location.href
     };
@@ -5358,7 +5480,7 @@ var qrcode = function() {
     frameImg.onload = function () {
       ctx.drawImage(frameImg, 0, 0, w, h);
 
-      var capText = 'EMA is turning One!';
+      var capText = headlinePhrase(true);
       var m = Math.min(w, h);
       var fontSize = Math.round(m * 0.062);
       ctx.textAlign = 'center';
