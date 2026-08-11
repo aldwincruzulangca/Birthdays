@@ -588,6 +588,15 @@
 
   .cam-hint { font-size: 11px; color: rgba(255,255,255,0.6); margin: 0; text-align: center; }
 
+  .wish-photo-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
+  .wish-photo-row .pillbtn { flex: 1 1 auto; font-size: 12.5px; }
+  .wish-photo-preview {
+    position: relative; width: 120px; height: 120px; margin: 0 0 12px;
+    border-radius: 14px; overflow: visible; box-shadow: 0 6px 16px var(--shadow);
+  }
+  .wish-photo-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 14px; display: block; }
+  .wish-bubble .wish-photo { display: block; width: 100%; border-radius: 14px; margin: 8px 0; }
+
   /* Live-camera controls float over the video itself (never part of the captured
      photo — the capture routine only ever draws the video/frame/stickers/text to
      canvas, these are DOM-only chrome) so the frame can use nearly the full modal. */
@@ -1130,6 +1139,15 @@
       <div class="field">
         <label for="wishMessage">Your Message</label>
         <textarea id="wishMessage" rows="3" placeholder="Write your wish for EMA and the family..." required></textarea>
+      </div>
+      <div class="wish-photo-row">
+        <button type="button" class="pillbtn p3" id="wishCamBtn">&#128247; Take a Photo</button>
+        <button type="button" class="pillbtn p3" id="wishGalleryBtn">&#128444;&#65039; Upload from Gallery</button>
+        <input type="file" accept="image/*" id="wishGalleryInput" hidden>
+      </div>
+      <div class="wish-photo-preview" id="wishPhotoPreviewWrap" hidden>
+        <img id="wishPhotoPreviewImg" alt="Attached photo">
+        <button type="button" class="sticker-del" id="wishPhotoRemoveBtn" aria-label="Remove photo">&times;</button>
       </div>
       <div class="wish-emoji-row">
         <button type="button" class="wish-emoji-toggle" id="wishEmojiToggle" aria-label="Add an emoji">😊</button>
@@ -4069,6 +4087,7 @@ var qrcode = function() {
   var recIndicator = document.getElementById('recIndicator');
   var recTimer = document.getElementById('recTimer');
   var camCaptureMode = 'photo';
+  var camMode = 'photobooth'; // 'photobooth' | 'wish' — wish mode skips the local download/party-grid save
   var mediaRecorder = null;
   var recordedChunks = [];
   var recordingInterval = null;
@@ -4299,8 +4318,10 @@ var qrcode = function() {
      available space (measured, not guessed via vh — vh/max-width interplay was
      silently letting width stay the binding constraint, so height increases had
      no visible effect). reservedBelow accounts for sibling UI stacked under it. */
-  function fitCamFrame(wrapEl, reservedBelow) {
-    var ratio = camOrientation === 'portrait' ? 9 / 16 : 16 / 9;
+  var uploadedImageRatio = null;
+
+  function fitCamFrame(wrapEl, reservedBelow, ratioOverride) {
+    var ratio = ratioOverride || (camOrientation === 'portrait' ? 9 / 16 : 16 / 9);
     var inner = document.querySelector('.cam-modal-inner');
     var innerRect = inner.getBoundingClientRect();
     var cs = getComputedStyle(inner);
@@ -4322,7 +4343,7 @@ var qrcode = function() {
     fitCamFrame(camFrameWrap, 96);
   }
   function refreshPreviewFrameSize() {
-    fitCamFrame(camPreviewWrap, 88);
+    fitCamFrame(camPreviewWrap, 88, uploadedImageRatio);
   }
 
   window.addEventListener('resize', function () {
@@ -4351,6 +4372,9 @@ var qrcode = function() {
     hidePickers();
     camEditBtn.style.display = '';
     setStickerTarget(null, null);
+    camMode = 'photobooth';
+    camModeBtn.style.display = '';
+    uploadedImageRatio = null;
     if (camPreviewVideo.src) { URL.revokeObjectURL(camPreviewVideo.src); camPreviewVideo.src = ''; }
     camPreviewVideo.hidden = true;
     camCanvas.hidden = false;
@@ -4459,15 +4483,45 @@ var qrcode = function() {
 
     drawStickersToCanvas(ctx, camFrameWrap, activeStickers, w, h);
 
+    uploadedImageRatio = null;
     camCanvas.toBlob(function (blob) {
       lastCaptureBlob = blob;
-      lastCaptureType = 'photo';
-      camCanvas.hidden = false;
-      camPreviewVideo.hidden = true;
-      camEditRow.hidden = false;
-      camSaveLabel.textContent = 'Save Photo';
-      enterPreview();
+      finishEnterPreviewFromCanvas(camMode === 'wish' ? 'Attach Photo' : 'Save Photo');
     }, 'image/jpeg', 0.92);
+  }
+
+  function finishEnterPreviewFromCanvas(saveLabel) {
+    lastCaptureType = 'photo';
+    camCanvas.hidden = false;
+    camPreviewVideo.hidden = true;
+    camEditRow.hidden = false;
+    camSaveLabel.textContent = saveLabel;
+    enterPreview();
+  }
+
+  // Draws a phone-gallery photo onto the shared capture canvas so it can go
+  // through the exact same frame/sticker preview-and-edit flow as a live shot.
+  function loadImageFile(file) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var w = img.naturalWidth, h = img.naturalHeight;
+      var MAXD = 1600;
+      if (Math.max(w, h) > MAXD) {
+        var s = MAXD / Math.max(w, h);
+        w = Math.round(w * s);
+        h = Math.round(h * s);
+      }
+      camCanvas.width = w;
+      camCanvas.height = h;
+      camCanvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      uploadedImageRatio = w / h;
+      camPreviewWrap.setAttribute('data-orientation', w >= h ? 'landscape' : 'portrait');
+      lastCaptureBlob = true;
+      finishEnterPreviewFromCanvas(camMode === 'wish' ? 'Attach Photo' : 'Save Photo');
+    };
+    img.src = url;
   }
 
   // Frame + caption are baked on top at final-save time (not at shutter press) so
@@ -4605,6 +4659,7 @@ var qrcode = function() {
     camEditBtn.style.display = '';
     camPickerToggle.hidden = true;
     hidePickers();
+    uploadedImageRatio = null;
     if (camPreviewVideo.src) { URL.revokeObjectURL(camPreviewVideo.src); camPreviewVideo.src = ''; }
     camPreviewVideo.hidden = true;
     camCanvas.hidden = false;
@@ -4616,6 +4671,11 @@ var qrcode = function() {
     if (!lastCaptureBlob) return;
 
     function finishSave(blob) {
+      if (camMode === 'wish') {
+        setWishPhotoPreview(blob);
+        closeCamModal(false);
+        return;
+      }
       var ts = Date.now();
       var ext = lastCaptureType === 'video' ? (blob.type.indexOf('mp4') !== -1 ? 'mp4' : 'webm') : 'jpg';
       var localUrl = URL.createObjectURL(blob);
@@ -4827,6 +4887,54 @@ var qrcode = function() {
   var wishEmpty = document.getElementById('wishEmpty');
   var wishEmojiToggle = document.getElementById('wishEmojiToggle');
   var wishEmojiPicker = document.getElementById('wishEmojiPicker');
+  var wishCamBtn = document.getElementById('wishCamBtn');
+  var wishGalleryBtn = document.getElementById('wishGalleryBtn');
+  var wishGalleryInput = document.getElementById('wishGalleryInput');
+  var wishPhotoPreviewWrap = document.getElementById('wishPhotoPreviewWrap');
+  var wishPhotoPreviewImg = document.getElementById('wishPhotoPreviewImg');
+  var wishPhotoRemoveBtn = document.getElementById('wishPhotoRemoveBtn');
+
+  var pendingWishPhotoBlob = null;
+  var pendingWishPhotoPreviewUrl = null;
+
+  function setWishPhotoPreview(blob) {
+    if (pendingWishPhotoPreviewUrl) URL.revokeObjectURL(pendingWishPhotoPreviewUrl);
+    pendingWishPhotoBlob = blob;
+    pendingWishPhotoPreviewUrl = URL.createObjectURL(blob);
+    wishPhotoPreviewImg.src = pendingWishPhotoPreviewUrl;
+    wishPhotoPreviewWrap.hidden = false;
+  }
+  function clearWishPhotoPreview() {
+    if (pendingWishPhotoPreviewUrl) URL.revokeObjectURL(pendingWishPhotoPreviewUrl);
+    pendingWishPhotoBlob = null;
+    pendingWishPhotoPreviewUrl = null;
+    wishPhotoPreviewImg.src = '';
+    wishPhotoPreviewWrap.hidden = true;
+  }
+
+  function openWishCam() {
+    camMode = 'wish';
+    camCaptureMode = 'photo';
+    camModeBtn.setAttribute('aria-pressed', 'false');
+    camShutterBtn.classList.remove('video-mode');
+    camModeBtn.style.display = 'none';
+    openCamModal();
+  }
+
+  wishCamBtn.addEventListener('click', openWishCam);
+
+  wishGalleryBtn.addEventListener('click', function () {
+    wishGalleryInput.click();
+  });
+  wishGalleryInput.addEventListener('change', function () {
+    var file = wishGalleryInput.files && wishGalleryInput.files[0];
+    wishGalleryInput.value = '';
+    if (!file) return;
+    openWishCam();
+    camStart.hidden = true;
+    loadImageFile(file);
+  });
+  wishPhotoRemoveBtn.addEventListener('click', clearWishPhotoPreview);
 
   EMOJI_SET.forEach(function (emoji) {
     var btn = document.createElement('button');
@@ -4855,6 +4963,7 @@ var qrcode = function() {
       bubble.className = 'wish-bubble';
       bubble.innerHTML =
         '<p class="who">' + escapeHtml(w.name) + '</p>' +
+        (w.photo ? '<img class="wish-photo" src="' + w.photo + '" alt="Photo from ' + escapeHtml(w.name) + '">' : '') +
         '<p class="msg">' + escapeHtml(w.message) + '</p>';
       wishThread.appendChild(bubble);
     });
@@ -4870,21 +4979,43 @@ var qrcode = function() {
     wishNote.textContent = 'Posting…';
     wishNote.className = 'rsvp-note';
 
-    manifest.wishes.push({ name: name, message: message, ts: Date.now() });
-    renderWishThread();
+    function postWish(photoUrl) {
+      var entry = { name: name, message: message, ts: Date.now() };
+      if (photoUrl) entry.photo = photoUrl;
+      manifest.wishes.push(entry);
+      renderWishThread();
 
-    var p = isConfigured() ? persistManifest() : Promise.resolve();
-    p.then(function () {
-      wishNote.textContent = 'Posted! 💌';
-      wishNote.className = 'rsvp-note ok';
-      wishForm.reset();
-      wishEmojiPicker.hidden = true;
-    }).catch(function () {
-      wishNote.textContent = 'Saved on this device, but couldn’t reach the shared list — it’ll sync next visit.';
-      wishNote.className = 'rsvp-note err';
-      wishForm.reset();
-      wishEmojiPicker.hidden = true;
-    });
+      var p = isConfigured() ? persistManifest() : Promise.resolve();
+      p.then(function () {
+        wishNote.textContent = 'Posted! 💌';
+        wishNote.className = 'rsvp-note ok';
+        wishForm.reset();
+        wishEmojiPicker.hidden = true;
+        clearWishPhotoPreview();
+      }).catch(function () {
+        wishNote.textContent = 'Saved on this device, but couldn’t reach the shared list — it’ll sync next visit.';
+        wishNote.className = 'rsvp-note err';
+        wishForm.reset();
+        wishEmojiPicker.hidden = true;
+        clearWishPhotoPreview();
+      });
+    }
+
+    if (pendingWishPhotoBlob && isConfigured()) {
+      var form = new FormData();
+      form.append('file', pendingWishPhotoBlob, 'ema-wish-' + Date.now() + '.jpg');
+      form.append('upload_preset', GALLERY_CONFIG.uploadPreset);
+      form.append('folder', 'ema-first-birthday/wishes');
+      fetch('https://api.cloudinary.com/v1_1/' + GALLERY_CONFIG.cloudName + '/image/upload', {
+        method: 'POST',
+        body: form
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) { postWish(data.secure_url || null); })
+        .catch(function () { postWish(null); });
+    } else {
+      postWish(null);
+    }
   });
 
   loadManifest();
