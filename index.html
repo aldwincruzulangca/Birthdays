@@ -966,10 +966,17 @@
       width: 100%;
       padding-bottom: 60px;
       box-shadow: none;
+      /* Without this, .app-shell's transform (used for the 481px "phone card"
+         centering trick) becomes the containing block for position:fixed
+         descendants — which then scroll away with .app-shell's own content
+         instead of staying glued to the viewport. At this breakpoint
+         .app-shell already fills the true viewport, so dropping the
+         transform here is purely a fix, not a visual change. */
+      transform: none;
     }
 
     nav.tabbar {
-      left: auto; right: 22px; bottom: auto; top: 50%;
+      left: 22px; right: auto; bottom: auto; top: 50%;
       transform: translateY(-50%);
       width: auto; max-width: none; height: auto;
       flex-direction: column; align-items: center; justify-content: center;
@@ -1442,7 +1449,7 @@
     <div class="qr-box" id="qrCode"></div>
   </section>
 
-  <footer class="sig">This invitation is up through October 11, 2026.</footer>
+  <footer class="sig">This invitation is up through October 11, 2027.</footer>
 </div>
 
 <nav class="tabbar" aria-label="Quick navigation">
