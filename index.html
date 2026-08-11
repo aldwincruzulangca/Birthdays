@@ -327,6 +327,8 @@
     border-radius: 999px;
   }
   .field input:focus-visible { outline: 2px solid var(--c-pin); outline-offset: 1px; }
+  #wishForm.is-locked input, #wishForm.is-locked textarea { opacity: 0.55; cursor: not-allowed; }
+  #wishForm.is-locked .wish-photo-row, #wishForm.is-locked .wish-emoji-row { opacity: 0.55; }
 
   .pillrow { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -1338,6 +1340,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
         Open Camera
       </button>
+      <p class="rsvp-note" id="camLaunchNote"></p>
     </div>
   </section>
 
@@ -5848,6 +5851,53 @@ var qrcode = function() {
   var wishPhotoPreviewWrap = document.getElementById('wishPhotoPreviewWrap');
   var wishPhotoPreviewImg = document.getElementById('wishPhotoPreviewImg');
   var wishPhotoRemoveBtn = document.getElementById('wishPhotoRemoveBtn');
+
+  // Wishes and the photobooth are both locked until the actual party — the
+  // sections stay visible, but the interactive parts refuse to activate
+  // until then. Admin can still bypass to test/preview.
+  var PARTY_LOCK_MESSAGE = 'This will be available on October 11, 2026 (Sunday) at the party.';
+  function isBeforeParty() {
+    return Date.now() < PARTY_START && !isAdminUnlocked();
+  }
+  function showWishLockNotice() {
+    wishNote.textContent = PARTY_LOCK_MESSAGE;
+    wishNote.className = 'rsvp-note';
+  }
+  function applyWishLockState() {
+    var locked = isBeforeParty();
+    wishName.readOnly = locked;
+    wishMessage.readOnly = locked;
+    wishForm.classList.toggle('is-locked', locked);
+  }
+  applyWishLockState();
+  [wishName, wishMessage].forEach(function (el) {
+    el.addEventListener('focus', function () {
+      if (isBeforeParty()) { el.blur(); showWishLockNotice(); }
+    });
+  });
+  // Capture-phase guards run before the feature handlers already bound to
+  // these elements further down, so a lock blocks the action outright.
+  [[wishCamBtn, 'click'], [wishGalleryBtn, 'click'], [wishEmojiToggle, 'click'], [wishForm, 'submit']].forEach(function (pair) {
+    pair[0].addEventListener(pair[1], function (e) {
+      if (isBeforeParty()) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showWishLockNotice();
+      }
+    }, true);
+  });
+
+  // Photobooth: the tab and party-shots grid stay viewable, only opening the
+  // camera itself is locked until the party.
+  var camLaunchNote = document.getElementById('camLaunchNote');
+  camOpenBtn.addEventListener('click', function (e) {
+    if (isBeforeParty()) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      camLaunchNote.textContent = PARTY_LOCK_MESSAGE;
+      camLaunchNote.className = 'rsvp-note';
+    }
+  }, true);
 
   var pendingWishPhotoBlob = null;
   var pendingWishPhotoPreviewUrl = null;
