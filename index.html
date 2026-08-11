@@ -1229,6 +1229,7 @@
           <div class="admin-row" style="margin-top: 10px;">
             <input type="file" id="uploadFile" accept="image/*" multiple>
           </div>
+          <p class="admin-msg" id="uploadCapHint"></p>
           <button type="button" id="uploadBtn" class="send-btn" style="margin-top: 14px;">
             Upload Photo(s)
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -4336,6 +4337,8 @@ var qrcode = function() {
   function renderCoverPicker(idx) {
     var slug = MONTH_SLUGS[idx];
     var urls = manifest.monthPhotos[slug] || [];
+    var capHint = document.getElementById('uploadCapHint');
+    if (capHint) capHint.textContent = urls.length + ' / ' + MAX_PHOTOS_PER_MONTH + ' photos in this album';
     coverPickerTray.innerHTML = '';
     if (urls.length < 2) { coverPickerBlock.hidden = true; return; }
     coverPickerBlock.hidden = false;
@@ -4377,6 +4380,8 @@ var qrcode = function() {
       });
   }
 
+  var MAX_PHOTOS_PER_MONTH = 20;
+
   document.getElementById('uploadBtn').addEventListener('click', function () {
     var fileInput = document.getElementById('uploadFile');
     var files = fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
@@ -4394,6 +4399,19 @@ var qrcode = function() {
       return;
     }
 
+    var existingCount = (manifest.monthPhotos[slug] || []).length;
+    var remaining = MAX_PHOTOS_PER_MONTH - existingCount;
+    if (remaining <= 0) {
+      adminUploadMsg.textContent = MONTHS[idx] + ' already has the max of ' + MAX_PHOTOS_PER_MONTH + ' photos.';
+      adminUploadMsg.className = 'admin-msg err';
+      return;
+    }
+    var skippedForCap = 0;
+    if (files.length > remaining) {
+      skippedForCap = files.length - remaining;
+      files = files.slice(0, remaining);
+    }
+
     var uploaded = 0;
     var failed = 0;
 
@@ -4401,14 +4419,15 @@ var qrcode = function() {
       if (i >= files.length) {
         if (!manifest.monthPhotos[slug]) manifest.monthPhotos[slug] = [];
         return persistManifest().then(function () {
+          var capNote = skippedForCap ? (' (' + skippedForCap + ' skipped — ' + MAX_PHOTOS_PER_MONTH + ' photo max per album)') : '';
           if (uploaded && !failed) {
-            adminUploadMsg.textContent = 'Added ' + uploaded + (uploaded === 1 ? ' photo' : ' photos') + ' to ' + MONTHS[idx] + '!';
-            adminUploadMsg.className = 'admin-msg ok';
+            adminUploadMsg.textContent = 'Added ' + uploaded + (uploaded === 1 ? ' photo' : ' photos') + ' to ' + MONTHS[idx] + '!' + capNote;
+            adminUploadMsg.className = capNote ? 'admin-msg err' : 'admin-msg ok';
           } else if (uploaded) {
-            adminUploadMsg.textContent = 'Added ' + uploaded + ', but ' + failed + ' failed. Try again for the rest.';
+            adminUploadMsg.textContent = 'Added ' + uploaded + ', but ' + failed + ' failed. Try again for the rest.' + capNote;
             adminUploadMsg.className = 'admin-msg err';
           } else {
-            adminUploadMsg.textContent = 'Upload failed for all photos.';
+            adminUploadMsg.textContent = 'Upload failed for all photos.' + capNote;
             adminUploadMsg.className = 'admin-msg err';
           }
           fileInput.value = '';
