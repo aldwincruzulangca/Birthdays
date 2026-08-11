@@ -309,12 +309,21 @@
   }
   .rsvp-admin-rows { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
   .rsvp-admin-row {
-    display: flex; justify-content: space-between; gap: 10px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
     background: #fff; border-radius: 10px; padding: 8px 12px;
     font-size: 12.5px;
   }
+  .rsvp-admin-row-info { display: flex; justify-content: space-between; flex: 1; gap: 10px; min-width: 0; }
   .rsvp-admin-row .nm { font-weight: 700; color: var(--ink); }
   .rsvp-admin-row .pl { color: var(--ink-soft); }
+  .rsvp-admin-del {
+    flex: none; width: 20px; height: 20px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,0.08); color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; line-height: 1; padding: 0;
+  }
+  .rsvp-admin-del:hover { background: var(--c-heart); color: #fff; }
+  .rsvp-admin-del:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .rsvp-admin-empty { font-size: 12px; color: var(--ink-soft); margin: 0; }
   .field { margin-bottom: 16px; }
   .field label {
@@ -791,6 +800,7 @@
   }
   .wish-empty { font-size: 12px; color: var(--ink-soft); text-align: center; margin: 10px 0; }
   .wish-bubble {
+    position: relative;
     background: var(--card, rgba(255,255,255,0.6));
     border: 1px solid var(--line);
     border-radius: 16px 16px 16px 4px;
@@ -799,9 +809,18 @@
   }
   .wish-bubble .who {
     font-family: 'Baloo Deco', sans-serif; font-weight: 700; font-size: 13px;
-    color: var(--c-heart); margin: 0 0 3px;
+    color: var(--c-heart); margin: 0 0 3px; padding-right: 20px;
   }
   .wish-bubble .msg { font-size: 13.5px; color: var(--ink); margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .wish-admin-del {
+    position: absolute; top: 8px; right: 8px;
+    width: 18px; height: 18px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,0.08); color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; line-height: 1; padding: 0;
+  }
+  .wish-admin-del:hover { background: var(--c-heart); color: #fff; }
+  .wish-admin-del:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
   .qr-card { text-align: center; margin-top: 26px; }
   .qr-label {
@@ -4536,17 +4555,30 @@ var qrcode = function() {
       var row = document.createElement('div');
       row.className = 'rsvp-admin-row';
       var c = getExtraCounts(r);
-      row.innerHTML = '<span class="nm">' + escapeHtml(r.name) + '</span><span class="pl">' +
-        escapeHtml(formatExtra(c.adults, c.children)) + '</span>';
+      row.innerHTML = '<div class="rsvp-admin-row-info"><span class="nm">' + escapeHtml(r.name) + '</span><span class="pl">' +
+        escapeHtml(formatExtra(c.adults, c.children)) + '</span></div>' +
+        '<button type="button" class="rsvp-admin-del" data-ts="' + r.ts + '" aria-label="Delete this RSVP">&times;</button>';
       rsvpRows.appendChild(row);
     });
   }
+
+  // Admin-only: remove any guest's RSVP (not just your own, unlike rsvpDeleteBtn above).
+  rsvpRows.addEventListener('click', function (e) {
+    var btn = e.target.closest('.rsvp-admin-del');
+    if (!btn) return;
+    var ts = parseFloat(btn.getAttribute('data-ts'));
+    manifest.rsvps = manifest.rsvps.filter(function (r) { return r.ts !== ts; });
+    renderRsvpAdmin();
+    if (isConfigured()) persistManifest().catch(function () {});
+  });
 
   function revealAdminExtras() {
     rsvpAdminList.hidden = false;
     renderRsvpAdmin();
     applyCelebrationState();
     renderCoverPicker(parseInt(uploadMonth.value, 10) || 0);
+    renderWishThread();
+    applyWishLockState();
   }
 
   function loadManifest() {
@@ -5963,17 +5995,29 @@ var qrcode = function() {
     var rows = manifest.wishes || [];
     wishThread.querySelectorAll('.wish-bubble').forEach(function (el) { el.remove(); });
     wishEmpty.style.display = rows.length ? 'none' : '';
+    var admin = isAdminUnlocked();
     rows.forEach(function (w) {
       var bubble = document.createElement('div');
       bubble.className = 'wish-bubble';
       bubble.innerHTML =
         '<p class="who">' + escapeHtml(w.name) + '</p>' +
         (w.photo ? '<img class="wish-photo" src="' + w.photo + '" alt="Photo from ' + escapeHtml(w.name) + '">' : '') +
-        '<p class="msg">' + escapeHtml(w.message) + '</p>';
+        '<p class="msg">' + escapeHtml(w.message) + '</p>' +
+        (admin ? '<button type="button" class="wish-admin-del" data-ts="' + w.ts + '" aria-label="Delete this wish">&times;</button>' : '');
       wishThread.appendChild(bubble);
     });
     wishThread.scrollTop = wishThread.scrollHeight;
   }
+
+  // Admin-only: remove any guest's wish.
+  wishThread.addEventListener('click', function (e) {
+    var btn = e.target.closest('.wish-admin-del');
+    if (!btn || !isAdminUnlocked()) return;
+    var ts = parseFloat(btn.getAttribute('data-ts'));
+    manifest.wishes = manifest.wishes.filter(function (w) { return w.ts !== ts; });
+    renderWishThread();
+    if (isConfigured()) persistManifest().catch(function () {});
+  });
 
   wishForm.addEventListener('submit', function (e) {
     e.preventDefault();
