@@ -329,6 +329,24 @@
   .field input:focus-visible { outline: 2px solid var(--c-pin); outline-offset: 1px; }
 
   .pillrow { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .counter-max-hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink-soft); font-size: 11px; }
+  .guest-counter { display: flex; flex-direction: column; gap: 8px; }
+  .counter-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #f7f2e9; border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px;
+  }
+  .counter-label { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+  .counter-label small { display: block; font-weight: 400; font-size: 10.5px; color: var(--ink-soft); }
+  .counter-controls { display: flex; align-items: center; gap: 14px; }
+  .counter-btn {
+    width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--p3); background: #fff;
+    color: var(--p3); font-size: 16px; font-weight: 700; cursor: pointer; line-height: 1; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .counter-btn:disabled { opacity: 0.32; cursor: not-allowed; }
+  .counter-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .counter-value { min-width: 18px; text-align: center; font-weight: 800; font-size: 15px; color: var(--ink); }
   .pillbtn {
     appearance: none; background: #fff; font-family: inherit; font-weight: 700;
     font-size: 13.5px; padding: 9px 18px; border-radius: 999px; cursor: pointer;
@@ -894,6 +912,49 @@
   #lightboxZoomReset { font-size: 10px; }
   .lightbox-zoom-controls button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
+  /* ---- Album modal: thumbnail grid for a single month, tap-outside to close ---- */
+  .album-modal:not([hidden]) {
+    position: fixed; inset: 0; z-index: 190;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(10, 6, 14, 0.7); backdrop-filter: blur(4px);
+    padding: 24px 16px;
+  }
+  .album-modal-inner {
+    background: var(--card-solid, #fffaf2);
+    border-radius: 22px;
+    width: 100%; max-width: 480px;
+    max-height: 82vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+  .album-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px; border-bottom: 1px solid var(--line);
+    flex: none;
+  }
+  .album-modal-header h3 {
+    font-family: 'Baloo Deco', sans-serif; font-weight: 800; font-size: 16px; color: var(--ink); margin: 0;
+  }
+  .album-modal-close {
+    width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(0,0,0,0.06); color: var(--ink); display: flex; align-items: center; justify-content: center;
+  }
+  .album-modal-close svg { width: 55%; height: 55%; }
+  .album-modal-close:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .album-modal-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    padding: 16px 18px; overflow-y: auto;
+  }
+  .album-thumb {
+    aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: none; padding: 0; cursor: zoom-in;
+  }
+  .album-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  @media (min-width: 1000px) {
+    .album-modal-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
   /* ---- Desktop/web view: left sidebar nav + a wider, multi-column layout.
      Placed last so it wins the cascade over the 481px "centered phone card"
      rules for the properties it overrides (same theme, just reflowed). ---- */
@@ -1034,11 +1095,24 @@
           <input type="text" id="guestContact" name="guestContact" placeholder="For updates or directions">
         </div>
         <div class="field">
-          <label>Plus Ones (Optional)</label>
-          <div class="pillrow" id="guestPills">
-            <button type="button" class="pillbtn p1" data-val="+1" aria-pressed="false">+1</button>
-            <button type="button" class="pillbtn p2" data-val="+2" aria-pressed="false">+2</button>
-            <button type="button" class="pillbtn p3" data-val="+3" aria-pressed="false">+3</button>
+          <label>Additional Guests <span class="counter-max-hint">(up to 3, on top of you)</span></label>
+          <div class="guest-counter">
+            <div class="counter-row">
+              <span class="counter-label">Adult</span>
+              <div class="counter-controls">
+                <button type="button" class="counter-btn" id="mainAdultMinus" aria-label="Fewer adults">&minus;</button>
+                <span class="counter-value" id="mainAdultCount">0</span>
+                <button type="button" class="counter-btn" id="mainAdultPlus" aria-label="More adults">&plus;</button>
+              </div>
+            </div>
+            <div class="counter-row">
+              <span class="counter-label">Child <small>(11 y/o &amp; below)</small></span>
+              <div class="counter-controls">
+                <button type="button" class="counter-btn" id="mainChildMinus" aria-label="Fewer children">&minus;</button>
+                <span class="counter-value" id="mainChildCount">0</span>
+                <button type="button" class="counter-btn" id="mainChildPlus" aria-label="More children">&plus;</button>
+              </div>
+            </div>
           </div>
           <input type="hidden" name="plusOnes" id="plusOnes" value="">
         </div>
@@ -1057,12 +1131,24 @@
           <input type="text" id="editGuestName">
         </div>
         <div class="field">
-          <label>Plus Ones</label>
-          <div class="pillrow" id="editGuestPills">
-            <button type="button" class="pillbtn p3" data-val="" aria-pressed="false">Just me</button>
-            <button type="button" class="pillbtn p1" data-val="+1" aria-pressed="false">+1</button>
-            <button type="button" class="pillbtn p2" data-val="+2" aria-pressed="false">+2</button>
-            <button type="button" class="pillbtn p3" data-val="+3" aria-pressed="false">+3</button>
+          <label>Additional Guests <span class="counter-max-hint">(up to 3, on top of you)</span></label>
+          <div class="guest-counter">
+            <div class="counter-row">
+              <span class="counter-label">Adult</span>
+              <div class="counter-controls">
+                <button type="button" class="counter-btn" id="editAdultMinus" aria-label="Fewer adults">&minus;</button>
+                <span class="counter-value" id="editAdultCount">0</span>
+                <button type="button" class="counter-btn" id="editAdultPlus" aria-label="More adults">&plus;</button>
+              </div>
+            </div>
+            <div class="counter-row">
+              <span class="counter-label">Child <small>(11 y/o &amp; below)</small></span>
+              <div class="counter-controls">
+                <button type="button" class="counter-btn" id="editChildMinus" aria-label="Fewer children">&minus;</button>
+                <span class="counter-value" id="editChildCount">0</span>
+                <button type="button" class="counter-btn" id="editChildPlus" aria-label="More children">&plus;</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="rsvp-edit-actions">
@@ -1282,6 +1368,18 @@
       <button type="button" id="lightboxZoomOut" aria-label="Zoom out">&minus;</button>
       <button type="button" id="lightboxZoomReset" aria-label="Reset zoom">1:1</button>
       <button type="button" id="lightboxZoomIn" aria-label="Zoom in">&plus;</button>
+    </div>
+  </div>
+
+  <div class="album-modal" id="albumModal" hidden>
+    <div class="album-modal-inner">
+      <div class="album-modal-header">
+        <h3 id="albumModalTitle"></h3>
+        <button type="button" class="album-modal-close" id="albumModalClose" aria-label="Close album">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="album-modal-grid" id="albumModalGrid"></div>
     </div>
   </div>
 
@@ -3703,7 +3801,7 @@ var qrcode = function() {
     tile.innerHTML = '<span class="n">' + (i === 0 ? '👶' : i) + '</span><span class="l">' + label + '</span>';
     tile.addEventListener('click', function () {
       if (manifest.months[MONTH_SLUGS[i]]) {
-        openGalleryLightbox(i);
+        openAlbumGrid(i);
       } else {
         goTo(i);
         slideshow.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3813,18 +3911,76 @@ var qrcode = function() {
     document.body.style.overflow = 'hidden';
     history.pushState({ lightbox: true }, '');
   }
-  function closeLightbox(fromPopstate) {
+  // Actually hides the lightbox — the ONLY place lightbox.hidden gets set, so a
+  // pending history.back() below and the popstate handler never race each other
+  // into closing both stacked modals (album grid + lightbox) on a single back-press.
+  function hideLightboxNow() {
     lightbox.hidden = true;
-    document.body.style.overflow = '';
-    if (!fromPopstate && history.state && history.state.lightbox) history.back();
+    // Leave the scroll lock on if the album grid is still open underneath.
+    if (albumModal.hidden) document.body.style.overflow = '';
+  }
+  function closeLightbox(fromPopstate) {
+    if (fromPopstate) { hideLightboxNow(); return; }
+    if (history.state && history.state.lightbox) history.back();
+    else hideLightboxNow();
   }
   function openGalleryLightbox(monthIdx) {
     var items = getGalleryLightboxItems();
     var pos = items.findIndex(function (it) { return it.idx === monthIdx; });
     if (pos !== -1) openLightbox(items, pos);
   }
+
+  /* ---- Album modal: tapping a month tile opens its own photo grid first;
+     tapping a thumbnail there opens the fullscreen lightbox, browsing only
+     within that album (not across all months). ---- */
+  var albumModal = document.getElementById('albumModal');
+  var albumModalTitle = document.getElementById('albumModalTitle');
+  var albumModalGrid = document.getElementById('albumModalGrid');
+
+  function getAlbumPhotoItems(monthIdx) {
+    var slug = MONTH_SLUGS[monthIdx];
+    var urls = (manifest.monthPhotos[slug] && manifest.monthPhotos[slug].length)
+      ? manifest.monthPhotos[slug]
+      : (manifest.months[slug] ? [manifest.months[slug]] : []);
+    return urls.map(function (url) { return { url: url, label: MONTHS[monthIdx], idx: monthIdx }; });
+  }
+
+  function openAlbumGrid(monthIdx) {
+    var items = getAlbumPhotoItems(monthIdx);
+    if (!items.length) return;
+    albumModalTitle.textContent = MONTHS[monthIdx];
+    albumModalGrid.innerHTML = '';
+    items.forEach(function (item, i) {
+      var thumb = document.createElement('button');
+      thumb.type = 'button';
+      thumb.className = 'album-thumb';
+      thumb.innerHTML = '<img src="' + item.url + '" alt="EMA, ' + item.label + '">';
+      thumb.addEventListener('click', function () { openLightbox(items, i); });
+      albumModalGrid.appendChild(thumb);
+    });
+    albumModal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    history.pushState({ albumModal: true }, '');
+  }
+  function hideAlbumGridNow() {
+    albumModal.hidden = true;
+    document.body.style.overflow = '';
+  }
+  function closeAlbumGrid(fromPopstate) {
+    if (fromPopstate) { hideAlbumGridNow(); return; }
+    if (history.state && history.state.albumModal) history.back();
+    else hideAlbumGridNow();
+  }
+  document.getElementById('albumModalClose').addEventListener('click', function () { closeAlbumGrid(false); });
+  albumModal.addEventListener('click', function (e) {
+    if (e.target === albumModal) closeAlbumGrid(false);
+  });
+
+  // Single handler so a back-press/gesture closes only the topmost modal —
+  // opening an album then a photo pushes two history states.
   window.addEventListener('popstate', function () {
     if (!lightbox.hidden) closeLightbox(true);
+    else if (!albumModal.hidden) closeAlbumGrid(true);
   });
 
   document.getElementById('lightboxClose').addEventListener('click', function () { closeLightbox(false); });
@@ -3923,15 +4079,62 @@ var qrcode = function() {
     if (e.target.tagName === 'IMG') openGalleryLightbox(current);
   });
 
-  var pills = document.querySelectorAll('#guestPills .pillbtn');
-  var hidden = document.getElementById('plusOnes');
-  pills.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var already = btn.getAttribute('aria-pressed') === 'true';
-      pills.forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
-      btn.setAttribute('aria-pressed', already ? 'false' : 'true');
-      hidden.value = already ? '' : btn.getAttribute('data-val');
+  var MAX_EXTRA_GUESTS = 3;
+
+  function createGuestCounter(prefix, onChange) {
+    var adultCountEl = document.getElementById(prefix + 'AdultCount');
+    var childCountEl = document.getElementById(prefix + 'ChildCount');
+    var adultMinus = document.getElementById(prefix + 'AdultMinus');
+    var adultPlus = document.getElementById(prefix + 'AdultPlus');
+    var childMinus = document.getElementById(prefix + 'ChildMinus');
+    var childPlus = document.getElementById(prefix + 'ChildPlus');
+    var state = { adults: 0, children: 0 };
+
+    function refresh() {
+      adultCountEl.textContent = state.adults;
+      childCountEl.textContent = state.children;
+      var total = state.adults + state.children;
+      adultPlus.disabled = total >= MAX_EXTRA_GUESTS;
+      childPlus.disabled = total >= MAX_EXTRA_GUESTS;
+      adultMinus.disabled = state.adults <= 0;
+      childMinus.disabled = state.children <= 0;
+      if (onChange) onChange({ adults: state.adults, children: state.children });
+    }
+    adultPlus.addEventListener('click', function () {
+      if (state.adults + state.children < MAX_EXTRA_GUESTS) { state.adults++; refresh(); }
     });
+    adultMinus.addEventListener('click', function () {
+      if (state.adults > 0) { state.adults--; refresh(); }
+    });
+    childPlus.addEventListener('click', function () {
+      if (state.adults + state.children < MAX_EXTRA_GUESTS) { state.children++; refresh(); }
+    });
+    childMinus.addEventListener('click', function () {
+      if (state.children > 0) { state.children--; refresh(); }
+    });
+    refresh();
+
+    return {
+      get: function () { return { adults: state.adults, children: state.children }; },
+      set: function (adults, children) {
+        state.adults = Math.max(0, adults || 0);
+        state.children = Math.max(0, children || 0);
+        var total = state.adults + state.children;
+        if (total > MAX_EXTRA_GUESTS) {
+          var over = total - MAX_EXTRA_GUESTS;
+          var reduceChildren = Math.min(over, state.children);
+          state.children -= reduceChildren;
+          over -= reduceChildren;
+          if (over > 0) state.adults = Math.max(0, state.adults - over);
+        }
+        refresh();
+      },
+      reset: function () { state.adults = 0; state.children = 0; refresh(); }
+    };
+  }
+
+  var mainGuestCounter = createGuestCounter('main', function (state) {
+    document.getElementById('plusOnes').value = formatExtra(state.adults, state.children);
   });
 
   var navLinks = document.querySelectorAll('nav.tabbar a');
@@ -4001,11 +4204,28 @@ var qrcode = function() {
   var rsvpTotal = document.getElementById('rsvpTotal');
   var rsvpRows = document.getElementById('rsvpRows');
 
+  // Older RSVPs (pre-counter) only have a "+N" plusOnes string with no adult/child
+  // split — treat those as all-adult so totals still add up correctly.
+  function getExtraCounts(r) {
+    if (typeof r.adults === 'number' || typeof r.children === 'number') {
+      return { adults: r.adults || 0, children: r.children || 0 };
+    }
+    var legacy = parseInt(String(r.plusOnes || '').replace('+', ''), 10);
+    return { adults: isNaN(legacy) ? 0 : legacy, children: 0 };
+  }
+  function formatExtra(adults, children) {
+    if (!adults && !children) return 'Just me';
+    var parts = [];
+    if (adults) parts.push(adults + (adults === 1 ? ' Adult' : ' Adults'));
+    if (children) parts.push(children + (children === 1 ? ' Child' : ' Children'));
+    return parts.join(', ');
+  }
+
   function renderRsvpAdmin() {
     var rows = manifest.rsvps || [];
     var total = rows.reduce(function (sum, r) {
-      var plus = parseInt(String(r.plusOnes || '').replace('+', ''), 10);
-      return sum + 1 + (isNaN(plus) ? 0 : plus);
+      var c = getExtraCounts(r);
+      return sum + 1 + c.adults + c.children;
     }, 0);
     rsvpTotal.textContent = total + (total === 1 ? ' guest attending' : ' guests attending') +
       ' — ' + rows.length + (rows.length === 1 ? ' RSVP' : ' RSVPs');
@@ -4017,8 +4237,9 @@ var qrcode = function() {
     rows.slice().reverse().forEach(function (r) {
       var row = document.createElement('div');
       row.className = 'rsvp-admin-row';
+      var c = getExtraCounts(r);
       row.innerHTML = '<span class="nm">' + escapeHtml(r.name) + '</span><span class="pl">' +
-        (r.plusOnes ? escapeHtml(r.plusOnes) : 'Just me') + '</span>';
+        escapeHtml(formatExtra(c.adults, c.children)) + '</span>';
       rsvpRows.appendChild(row);
     });
   }
@@ -4222,7 +4443,7 @@ var qrcode = function() {
     e.preventDefault();
     var name = document.getElementById('guestName').value.trim();
     var contact = document.getElementById('guestContact').value.trim();
-    var plusOnesVal = rsvpPlusOnesInput.value;
+    var extra = mainGuestCounter.get();
 
     if (!name) return;
 
@@ -4240,7 +4461,7 @@ var qrcode = function() {
       }).catch(function () { /* best-effort — the on-page save is the source of truth */ })
     );
 
-    manifest.rsvps.push({ name: name, contact: contact, plusOnes: plusOnesVal, ts: ts });
+    manifest.rsvps.push({ name: name, contact: contact, adults: extra.adults, children: extra.children, ts: ts });
     renderRsvpAdmin();
     if (isConfigured()) {
       tasks.push(persistManifest().catch(function () {}));
@@ -4249,10 +4470,10 @@ var qrcode = function() {
     Promise.all(tasks).then(function () {
       rsvpNote.textContent = 'Thank you, ' + name + '! Your RSVP is in. 🎉';
       rsvpNote.className = 'rsvp-note ok';
-      setMyRsvp({ name: name, contact: contact, plusOnes: plusOnesVal, ts: ts });
+      setMyRsvp({ name: name, contact: contact, adults: extra.adults, children: extra.children, ts: ts });
       refreshEditLinkVisibility();
       rsvpForm.reset();
-      pills.forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+      mainGuestCounter.reset();
       rsvpPlusOnesInput.value = '';
       renderRsvpAdmin();
     });
@@ -4263,9 +4484,8 @@ var qrcode = function() {
   var rsvpEditLink = document.getElementById('rsvpEditLink');
   var rsvpEditPanel = document.getElementById('rsvpEditPanel');
   var editGuestName = document.getElementById('editGuestName');
-  var editPills = document.querySelectorAll('#editGuestPills .pillbtn');
   var rsvpEditMsg = document.getElementById('rsvpEditMsg');
-  var editPlusOnesVal = '';
+  var editGuestCounter = createGuestCounter('edit');
 
   function getMyRsvp() {
     try { return JSON.parse(localStorage.getItem(MY_RSVP_KEY) || 'null'); } catch (e) { return null; }
@@ -4285,20 +4505,10 @@ var qrcode = function() {
     var mine = getMyRsvp();
     if (!mine) return;
     editGuestName.value = mine.name || '';
-    editPlusOnesVal = mine.plusOnes || '';
-    editPills.forEach(function (b) {
-      b.setAttribute('aria-pressed', b.getAttribute('data-val') === editPlusOnesVal ? 'true' : 'false');
-    });
+    var c = getExtraCounts(mine);
+    editGuestCounter.set(c.adults, c.children);
     rsvpEditMsg.textContent = '';
     rsvpEditPanel.hidden = !rsvpEditPanel.hidden;
-  });
-
-  editPills.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      editPills.forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
-      btn.setAttribute('aria-pressed', 'true');
-      editPlusOnesVal = btn.getAttribute('data-val');
-    });
   });
 
   document.getElementById('rsvpSaveEditBtn').addEventListener('click', function () {
@@ -4311,7 +4521,8 @@ var qrcode = function() {
       return;
     }
 
-    var updated = { name: newName, contact: mine.contact || '', plusOnes: editPlusOnesVal, ts: mine.ts };
+    var editExtra = editGuestCounter.get();
+    var updated = { name: newName, contact: mine.contact || '', adults: editExtra.adults, children: editExtra.children, ts: mine.ts };
     var idx = manifest.rsvps.findIndex(function (r) { return r.ts === mine.ts; });
     if (idx !== -1) { manifest.rsvps[idx] = updated; } else { manifest.rsvps.push(updated); }
     setMyRsvp(updated);
