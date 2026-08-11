@@ -5785,6 +5785,11 @@ var qrcode = function() {
   var THANKYOU_HEADLINE = 'Thank You!';
   var THANKYOU_BODY = 'Thank You for giving precious time to celebrate this special Day of our EMA and family! I hope you enjoy the food and party!';
 
+  // The closing card's caption switches to the Thank You message at the
+  // actual party start time, independent of the admin's manual "celebration
+  // live" switch below (which only governs the wishes wall).
+  var PARTY_START = new Date('2026-10-11T14:30:00').getTime();
+
   function isAdminUnlocked() {
     return sessionStorage.getItem('emaGalleryAdmin') === '1';
   }
@@ -5792,9 +5797,10 @@ var qrcode = function() {
   function applyCelebrationState() {
     var isLive = manifest.celebrationLive === true;
     var showContent = isLive || isAdminUnlocked();
+    var closingLive = Date.now() >= PARTY_START || isAdminUnlocked();
 
-    closingHeadlineEl.textContent = showContent ? THANKYOU_HEADLINE : DEFAULT_CLOSING_HEADLINE;
-    closingBodyEl.textContent = showContent ? THANKYOU_BODY : DEFAULT_CLOSING_BODY;
+    closingHeadlineEl.textContent = closingLive ? THANKYOU_HEADLINE : DEFAULT_CLOSING_HEADLINE;
+    closingBodyEl.textContent = closingLive ? THANKYOU_BODY : DEFAULT_CLOSING_BODY;
     wishesCardEl.hidden = !showContent;
 
     if (isAdminUnlocked()) {
