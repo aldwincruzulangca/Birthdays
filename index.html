@@ -833,6 +833,67 @@
     .sparkle { animation: none; opacity: 0.7; }
   }
 
+  .g-tile img, .slide img { cursor: zoom-in; }
+
+  /* ---- Gallery lightbox ---- */
+  .lightbox:not([hidden]) {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(10, 6, 14, 0.94);
+    touch-action: none;
+  }
+  .lightbox-stage {
+    position: relative; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .lightbox-stage img {
+    max-width: 90vw; max-height: 76vh;
+    touch-action: none; -webkit-user-select: none; user-select: none;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    cursor: zoom-in;
+  }
+  .lightbox-close {
+    position: fixed; top: max(16px, env(safe-area-inset-top)); right: 16px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.14); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; z-index: 201; backdrop-filter: blur(6px);
+  }
+  .lightbox-close svg { width: 45%; height: 45%; }
+  .lightbox-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .lightbox-nav {
+    position: fixed; top: 50%; transform: translateY(-50%);
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(255,255,255,0.14); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; z-index: 201; backdrop-filter: blur(6px);
+  }
+  .lightbox-nav svg { width: 20px; height: 20px; }
+  .lightbox-nav.prev { left: max(10px, env(safe-area-inset-left)); }
+  .lightbox-nav.next { right: max(10px, env(safe-area-inset-right)); }
+  .lightbox-nav:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .lightbox-caption {
+    position: fixed; left: 0; right: 0; bottom: calc(70px + env(safe-area-inset-bottom));
+    text-align: center; color: #fff; font-size: 13px; font-weight: 700;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.5); margin: 0; pointer-events: none; z-index: 201;
+  }
+  .lightbox-zoom-controls {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 201;
+  }
+  .lightbox-zoom-controls button {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(255,255,255,0.14); border: none; cursor: pointer;
+    color: #fff; font-size: 15px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px);
+  }
+  #lightboxZoomReset { font-size: 10px; }
+  .lightbox-zoom-controls button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
   /* ---- Desktop/web view: left sidebar nav + a wider, multi-column layout.
      Placed last so it wins the cascade over the 481px "centered phone card"
      rules for the properties it overrides (same theme, just reflowed). ---- */
@@ -1200,6 +1261,27 @@
         <p class="cam-hint">Tap a sticker to add it &mdash; drag to move, pinch to resize &amp; rotate</p>
         <div class="sticker-tray" id="stickerTray"></div>
       </div>
+    </div>
+  </div>
+
+  <div class="lightbox" id="lightbox" hidden>
+    <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <button type="button" class="lightbox-nav prev" id="lightboxPrev" aria-label="Previous photo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <button type="button" class="lightbox-nav next" id="lightboxNext" aria-label="Next photo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+    <div class="lightbox-stage" id="lightboxStage">
+      <img id="lightboxImg" alt="">
+    </div>
+    <p class="lightbox-caption" id="lightboxCaption"></p>
+    <div class="lightbox-zoom-controls">
+      <button type="button" id="lightboxZoomOut" aria-label="Zoom out">&minus;</button>
+      <button type="button" id="lightboxZoomReset" aria-label="Reset zoom">1:1</button>
+      <button type="button" id="lightboxZoomIn" aria-label="Zoom in">&plus;</button>
     </div>
   </div>
 
@@ -3620,8 +3702,12 @@ var qrcode = function() {
     tile.style.background = 'linear-gradient(150deg, var(--' + hue + '), var(--' + hue2 + '))';
     tile.innerHTML = '<span class="n">' + (i === 0 ? '👶' : i) + '</span><span class="l">' + label + '</span>';
     tile.addEventListener('click', function () {
-      goTo(i);
-      slideshow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (manifest.months[MONTH_SLUGS[i]]) {
+        openGalleryLightbox(i);
+      } else {
+        goTo(i);
+        slideshow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     });
     grid.appendChild(tile);
     tiles.push(tile);
@@ -3682,6 +3768,160 @@ var qrcode = function() {
   startAutoplay();
   slideshow.addEventListener('mouseenter', function () { if (autoplayId) clearInterval(autoplayId); });
   slideshow.addEventListener('mouseleave', startAutoplay);
+
+  /* ---- Gallery lightbox: full-view popup with left/right browsing + zoom ---- */
+  var lightbox = document.getElementById('lightbox');
+  var lightboxStage = document.getElementById('lightboxStage');
+  var lightboxImg = document.getElementById('lightboxImg');
+  var lightboxCaption = document.getElementById('lightboxCaption');
+  var lightboxItems = [];
+  var lightboxIndex = 0;
+  var lbScale = 1, lbX = 0, lbY = 0;
+
+  function getGalleryLightboxItems() {
+    var items = [];
+    MONTHS.forEach(function (label, i) {
+      if (manifest.months[MONTH_SLUGS[i]]) items.push({ url: manifest.months[MONTH_SLUGS[i]], label: label, idx: i });
+    });
+    return items;
+  }
+
+  function clampLbZoom(v) { return Math.max(1, Math.min(4, v)); }
+  function applyLbTransform() {
+    lightboxImg.style.transform = 'translate(' + lbX + 'px, ' + lbY + 'px) scale(' + lbScale + ')';
+  }
+  function resetLightboxZoom() {
+    lbScale = 1; lbX = 0; lbY = 0;
+    applyLbTransform();
+  }
+
+  function renderLightboxCurrent() {
+    var item = lightboxItems[lightboxIndex];
+    if (!item) return;
+    lightboxImg.src = item.url;
+    lightboxImg.alt = 'EMA, ' + item.label;
+    lightboxCaption.textContent = item.label;
+    resetLightboxZoom();
+  }
+
+  function openLightbox(items, startIndex) {
+    if (!items.length) return;
+    lightboxItems = items;
+    lightboxIndex = startIndex;
+    renderLightboxCurrent();
+    lightbox.hidden = false;
+    document.body.style.overflow = 'hidden';
+    history.pushState({ lightbox: true }, '');
+  }
+  function closeLightbox(fromPopstate) {
+    lightbox.hidden = true;
+    document.body.style.overflow = '';
+    if (!fromPopstate && history.state && history.state.lightbox) history.back();
+  }
+  function openGalleryLightbox(monthIdx) {
+    var items = getGalleryLightboxItems();
+    var pos = items.findIndex(function (it) { return it.idx === monthIdx; });
+    if (pos !== -1) openLightbox(items, pos);
+  }
+  window.addEventListener('popstate', function () {
+    if (!lightbox.hidden) closeLightbox(true);
+  });
+
+  document.getElementById('lightboxClose').addEventListener('click', function () { closeLightbox(false); });
+  lightbox.addEventListener('click', function (e) {
+    if (e.target === lightbox || e.target === lightboxStage) closeLightbox(false);
+  });
+
+  function lbGoTo(delta) {
+    lightboxIndex = (lightboxIndex + delta + lightboxItems.length) % lightboxItems.length;
+    renderLightboxCurrent();
+  }
+  document.getElementById('lightboxPrev').addEventListener('click', function (e) { e.stopPropagation(); lbGoTo(-1); });
+  document.getElementById('lightboxNext').addEventListener('click', function (e) { e.stopPropagation(); lbGoTo(1); });
+
+  window.addEventListener('keydown', function (e) {
+    if (lightbox.hidden) return;
+    if (e.key === 'Escape') closeLightbox(false);
+    else if (e.key === 'ArrowLeft') lbGoTo(-1);
+    else if (e.key === 'ArrowRight') lbGoTo(1);
+  });
+
+  document.getElementById('lightboxZoomIn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    lbScale = clampLbZoom(lbScale + 0.5);
+    applyLbTransform();
+  });
+  document.getElementById('lightboxZoomOut').addEventListener('click', function (e) {
+    e.stopPropagation();
+    lbScale = clampLbZoom(lbScale - 0.5);
+    if (lbScale === 1) { lbX = 0; lbY = 0; }
+    applyLbTransform();
+  });
+  document.getElementById('lightboxZoomReset').addEventListener('click', function (e) {
+    e.stopPropagation();
+    resetLightboxZoom();
+  });
+
+  lightboxImg.addEventListener('click', function (e) { e.stopPropagation(); });
+  lightboxImg.addEventListener('dblclick', function (e) {
+    e.stopPropagation();
+    if (lbScale > 1) resetLightboxZoom();
+    else { lbScale = 2.2; applyLbTransform(); }
+  });
+
+  // Pinch-to-zoom, drag-to-pan when zoomed, and swipe-to-browse when not — mirrors
+  // the sticker editor's pointer-events approach used in the photobooth.
+  (function () {
+    var pointers = new Map();
+    var startDist = 0, startScale = 1;
+    var dragging = false, dragStartX = 0, dragStartY = 0, dragOrigX = 0, dragOrigY = 0;
+    var swipeStartX = null;
+
+    lightboxImg.addEventListener('pointerdown', function (e) {
+      lightboxImg.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) {
+        dragging = true;
+        dragStartX = e.clientX; dragStartY = e.clientY;
+        dragOrigX = lbX; dragOrigY = lbY;
+        swipeStartX = e.clientX;
+      } else if (pointers.size === 2) {
+        var pts = Array.from(pointers.values());
+        startDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        startScale = lbScale;
+        swipeStartX = null;
+      }
+    });
+    lightboxImg.addEventListener('pointermove', function (e) {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        var pts = Array.from(pointers.values());
+        var dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        lbScale = clampLbZoom(startScale * (dist / (startDist || 1)));
+        applyLbTransform();
+      } else if (pointers.size === 1 && dragging && lbScale > 1) {
+        lbX = dragOrigX + (e.clientX - dragStartX);
+        lbY = dragOrigY + (e.clientY - dragStartY);
+        applyLbTransform();
+      }
+    });
+    function endPointer(e) {
+      if (pointers.size === 1 && lbScale === 1 && swipeStartX !== null) {
+        var dx = e.clientX - swipeStartX;
+        if (Math.abs(dx) > 60) lbGoTo(dx < 0 ? 1 : -1);
+      }
+      pointers.delete(e.pointerId);
+      dragging = pointers.size > 0;
+      swipeStartX = null;
+    }
+    lightboxImg.addEventListener('pointerup', endPointer);
+    lightboxImg.addEventListener('pointercancel', endPointer);
+  })();
+
+  slideshow.addEventListener('click', function (e) {
+    if (e.target.tagName === 'IMG') openGalleryLightbox(current);
+  });
 
   var pills = document.querySelectorAll('#guestPills .pillbtn');
   var hidden = document.getElementById('plusOnes');
