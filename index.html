@@ -401,6 +401,14 @@
     font-size: 15px; color: #fff; text-shadow: 0 2px 6px var(--shadow);
     margin: 4px 0 0;
   }
+  .slide-caption {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 10px 12px;
+    background: linear-gradient(to top, rgba(0,0,0,0.55), transparent);
+  }
+  .slide-caption .placeholder-num { font-size: 22px; }
+  .slide-caption .placeholder-label { font-size: 11px; margin-top: 2px; }
   .slide-nav {
     position: absolute; top: 50%; transform: translateY(-50%);
     width: 34px; height: 34px; border-radius: 50%;
@@ -429,6 +437,14 @@
     cursor: pointer; border: none; padding: 0; position: relative;
   }
   .g-tile img, .g-tile video { width: 100%; height: 100%; object-fit: cover; }
+  .g-tile .tile-caption {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px 4px 8px;
+    background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+  }
+  .g-tile .tile-caption .n { font-size: 15px; }
+  .g-tile .tile-caption .l { font-size: 8px; }
   .g-tile-play {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: 34px; height: 34px; border-radius: 50%;
@@ -473,6 +489,20 @@
   .admin-msg { font-size: 11.5px; color: var(--ink-soft); margin: 10px 0 0; min-height: 14px; }
   .admin-msg.err { color: var(--c-heart); }
   .admin-msg.ok { color: var(--c-pin); }
+
+  .cover-picker-block { margin-top: 16px; }
+  .cover-picker-block label { display: block; font-size: 11.5px; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px; }
+  .cover-thumb {
+    position: relative; padding: 0; overflow: hidden;
+    background: #fff; border: 1.5px solid var(--line);
+  }
+  .cover-thumb img { object-fit: cover; border-radius: inherit; }
+  .cover-thumb.is-cover { border-color: var(--c-pin); box-shadow: 0 0 0 2px var(--c-pin); }
+  .cover-thumb .cover-check {
+    position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--c-pin); color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
 
   /* ---- Photobooth launcher ---- */
   .cam-launcher { text-align: center; }
@@ -1050,13 +1080,18 @@
             <select id="uploadMonth"></select>
           </div>
           <div class="admin-row" style="margin-top: 10px;">
-            <input type="file" id="uploadFile" accept="image/*">
+            <input type="file" id="uploadFile" accept="image/*" multiple>
           </div>
           <button type="button" id="uploadBtn" class="send-btn" style="margin-top: 14px;">
-            Upload Photo
+            Upload Photo(s)
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           </button>
           <p class="admin-msg" id="adminUploadMsg"></p>
+
+          <div class="cover-picker-block" id="coverPickerBlock" hidden>
+            <label>Album Cover for This Month</label>
+            <div class="sticker-tray" id="coverPickerTray"></div>
+          </div>
 
           <label for="videoUrlInput" style="margin-top: 18px;">Video Link (YouTube or Facebook)</label>
           <div class="admin-row">
@@ -3602,10 +3637,14 @@ var qrcode = function() {
     var slide = slides[i];
     var tile = tiles[i];
     if (!slide || !tile) return;
+    var numLabel = i === 0 ? '👶' : i;
     slide.style.background = '#000';
-    slide.innerHTML = '<img src="' + url + '" alt="EMA, ' + MONTHS[i] + '">';
+    slide.innerHTML = '<img src="' + url + '" alt="EMA, ' + MONTHS[i] + '">' +
+      '<span class="slide-caption"><span class="placeholder-num">' + numLabel + '</span>' +
+      '<span class="placeholder-label">' + MONTHS[i] + '</span></span>';
     tile.style.background = '#000';
-    tile.innerHTML = '<img src="' + url + '" alt="EMA, ' + MONTHS[i] + '">';
+    tile.innerHTML = '<img src="' + url + '" alt="EMA, ' + MONTHS[i] + '">' +
+      '<span class="tile-caption"><span class="n">' + numLabel + '</span><span class="l">' + MONTHS[i] + '</span></span>';
     var probe = new Image();
     probe.onload = function () {
       if (probe.naturalWidth && probe.naturalHeight) {
@@ -3689,13 +3728,16 @@ var qrcode = function() {
     });
   }
 
-  var manifest = { months: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '' };
+  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '' };
 
   function persistManifest() {
     var record = {
       months: MONTH_SLUGS
         .filter(function (s) { return manifest.months[s]; })
         .map(function (s) { return { slug: s, url: manifest.months[s] }; }),
+      monthPhotos: MONTH_SLUGS
+        .filter(function (s) { return manifest.monthPhotos[s] && manifest.monthPhotos[s].length; })
+        .map(function (s) { return { slug: s, urls: manifest.monthPhotos[s] }; }),
       photobooth: manifest.photobooth,
       rsvps: manifest.rsvps,
       wishes: manifest.wishes,
@@ -3745,6 +3787,7 @@ var qrcode = function() {
     rsvpAdminList.hidden = false;
     renderRsvpAdmin();
     applyCelebrationState();
+    renderCoverPicker(parseInt(uploadMonth.value, 10) || 0);
   }
 
   function loadManifest() {
@@ -3761,6 +3804,12 @@ var qrcode = function() {
           if (i !== -1 && entry.url) {
             manifest.months[entry.slug] = entry.url;
             setSlidePhoto(i, entry.url);
+          }
+        });
+        var monthPhotosArr = record && Array.isArray(record.monthPhotos) ? record.monthPhotos : [];
+        monthPhotosArr.forEach(function (entry) {
+          if (MONTH_SLUGS.indexOf(entry.slug) !== -1 && Array.isArray(entry.urls)) {
+            manifest.monthPhotos[entry.slug] = entry.urls;
           }
         });
         manifest.photobooth = (record && Array.isArray(record.photobooth)) ? record.photobooth : [];
@@ -3820,9 +3869,56 @@ var qrcode = function() {
     }
   });
 
+  var coverPickerBlock = document.getElementById('coverPickerBlock');
+  var coverPickerTray = document.getElementById('coverPickerTray');
+
+  function renderCoverPicker(idx) {
+    var slug = MONTH_SLUGS[idx];
+    var urls = manifest.monthPhotos[slug] || [];
+    coverPickerTray.innerHTML = '';
+    if (urls.length < 2) { coverPickerBlock.hidden = true; return; }
+    coverPickerBlock.hidden = false;
+    urls.forEach(function (url) {
+      var thumb = document.createElement('button');
+      thumb.type = 'button';
+      thumb.className = 'sticker-thumb cover-thumb' + (manifest.months[slug] === url ? ' is-cover' : '');
+      thumb.innerHTML = '<img src="' + url + '" alt="Photo option">' +
+        (manifest.months[slug] === url ? '<span class="cover-check">&#10003;</span>' : '');
+      thumb.addEventListener('click', function () {
+        manifest.months[slug] = url;
+        setSlidePhoto(idx, url);
+        renderCoverPicker(idx);
+        if (isConfigured()) {
+          persistManifest().catch(function () {});
+        }
+      });
+      coverPickerTray.appendChild(thumb);
+    });
+  }
+
+  uploadMonth.addEventListener('change', function () {
+    renderCoverPicker(parseInt(uploadMonth.value, 10));
+  });
+
+  function uploadOneToCloudinary(file, slug) {
+    var form = new FormData();
+    form.append('file', file);
+    form.append('upload_preset', GALLERY_CONFIG.uploadPreset);
+    form.append('folder', 'ema-first-birthday/' + slug);
+    return fetch('https://api.cloudinary.com/v1_1/' + GALLERY_CONFIG.cloudName + '/image/upload', {
+      method: 'POST',
+      body: form
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.secure_url) throw new Error(data.error && data.error.message || 'Upload failed');
+        return data.secure_url;
+      });
+  }
+
   document.getElementById('uploadBtn').addEventListener('click', function () {
     var fileInput = document.getElementById('uploadFile');
-    var file = fileInput.files && fileInput.files[0];
+    var files = fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
     var idx = parseInt(uploadMonth.value, 10);
     var slug = MONTH_SLUGS[idx];
 
@@ -3831,40 +3927,50 @@ var qrcode = function() {
       adminUploadMsg.className = 'admin-msg err';
       return;
     }
-    if (!file) {
-      adminUploadMsg.textContent = 'Choose a photo first.';
+    if (!files.length) {
+      adminUploadMsg.textContent = 'Choose one or more photos first.';
       adminUploadMsg.className = 'admin-msg err';
       return;
     }
 
-    adminUploadMsg.textContent = 'Uploading…';
-    adminUploadMsg.className = 'admin-msg';
+    var uploaded = 0;
+    var failed = 0;
 
-    var form = new FormData();
-    form.append('file', file);
-    form.append('upload_preset', GALLERY_CONFIG.uploadPreset);
-    form.append('folder', 'ema-first-birthday/' + slug);
+    function uploadNext(i) {
+      if (i >= files.length) {
+        if (!manifest.monthPhotos[slug]) manifest.monthPhotos[slug] = [];
+        return persistManifest().then(function () {
+          if (uploaded && !failed) {
+            adminUploadMsg.textContent = 'Added ' + uploaded + (uploaded === 1 ? ' photo' : ' photos') + ' to ' + MONTHS[idx] + '!';
+            adminUploadMsg.className = 'admin-msg ok';
+          } else if (uploaded) {
+            adminUploadMsg.textContent = 'Added ' + uploaded + ', but ' + failed + ' failed. Try again for the rest.';
+            adminUploadMsg.className = 'admin-msg err';
+          } else {
+            adminUploadMsg.textContent = 'Upload failed for all photos.';
+            adminUploadMsg.className = 'admin-msg err';
+          }
+          fileInput.value = '';
+          renderCoverPicker(idx);
+        });
+      }
+      adminUploadMsg.textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + '…';
+      adminUploadMsg.className = 'admin-msg';
+      return uploadOneToCloudinary(files[i], slug)
+        .then(function (url) {
+          uploaded++;
+          if (!manifest.monthPhotos[slug]) manifest.monthPhotos[slug] = [];
+          manifest.monthPhotos[slug].push(url);
+          if (!manifest.months[slug]) {
+            manifest.months[slug] = url;
+            setSlidePhoto(idx, url);
+          }
+        })
+        .catch(function () { failed++; })
+        .then(function () { return uploadNext(i + 1); });
+    }
 
-    fetch('https://api.cloudinary.com/v1_1/' + GALLERY_CONFIG.cloudName + '/image/upload', {
-      method: 'POST',
-      body: form
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (!data.secure_url) throw new Error(data.error && data.error.message || 'Upload failed');
-        manifest.months[slug] = data.secure_url;
-        setSlidePhoto(idx, data.secure_url);
-        return persistManifest();
-      })
-      .then(function () {
-        adminUploadMsg.textContent = 'Added to ' + MONTHS[idx] + '!';
-        adminUploadMsg.className = 'admin-msg ok';
-        fileInput.value = '';
-      })
-      .catch(function (e) {
-        adminUploadMsg.textContent = 'Something went wrong: ' + e.message;
-        adminUploadMsg.className = 'admin-msg err';
-      });
+    uploadNext(0);
   });
 
   /* ---- RSVP: on-page save (admin-visible) + best-effort Formspree email ---- */
