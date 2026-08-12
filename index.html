@@ -79,9 +79,13 @@
     background-size: 26px 26px, 100% 100%;
   }
 
-  /* Desktop only: frame the page as a centered phone-width card. Fixed
-     positioning inside a transformed ancestor is fine here since there's
-     no touch-scroll physics on desktop to expose the jitter. */
+  /* Desktop/tablet: frame the page as a centered phone-width card. No
+     transform here (a transformed ancestor becomes the containing block for
+     position:fixed descendants, and — contrary to what this comment used to
+     claim — they then scroll away with .app-shell's own internal scroll
+     instead of staying glued to the viewport). Every position:fixed element
+     on the page (nav, modals, the music widget) relies on the true viewport
+     as its containing block instead. */
   @media (min-width: 481px) {
     html, body { height: 100%; overflow: hidden; }
     body { background: #e6e0ea; display: flex; justify-content: center; }
@@ -94,7 +98,6 @@
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
       position: relative;
-      transform: translateZ(0);
       box-shadow: 0 0 60px rgba(0, 0, 0, 0.18);
     }
     .app-shell::-webkit-scrollbar { display: none; width: 0; height: 0; }
@@ -838,30 +841,39 @@
   }
 
   /* ---- Background music widget: same toggle+slider pattern as the
-     Winfinity adventure page, scaled way down (small icon-only footprint
-     rather than a full standalone panel) since this is a light amenity, not
-     a page feature. ---- */
+     Winfinity adventure page. Sits opposite the nav pill — vertically
+     centered on the right, mirroring the desktop nav's centered-left
+     placement — so it reads as "the other side" at every width and never
+     competes with the banner's star badge up top. ---- */
   .music-widget {
-    position: fixed; top: max(14px, env(safe-area-inset-top)); left: 14px;
+    position: fixed; top: 50%; right: 14px; transform: translateY(-50%);
     z-index: 55; display: flex; flex-direction: column; align-items: center;
-    gap: 6px;
+    gap: 10px;
   }
   .music-toggle {
-    width: 22px; height: 22px; border-radius: 50%; border: none;
+    width: 55px; height: 55px; border-radius: 50%; border: none;
     background: rgba(255, 253, 248, 0.75); color: var(--ink-soft); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 12px rgba(70, 55, 90, 0.18);
+    box-shadow: 0 6px 18px rgba(70, 55, 90, 0.22);
   }
-  .music-toggle svg { width: 11px; height: 11px; }
+  .music-toggle svg { width: 28px; height: 28px; }
   .music-toggle.is-muted { color: var(--ink-soft); opacity: 0.6; }
   .music-toggle:focus-visible { outline: 2px solid var(--c-pin); outline-offset: 2px; }
   .music-volume-panel {
-    background: rgba(255, 253, 248, 0.75); border-radius: 8px;
-    padding: 6px 3px; box-shadow: 0 4px 12px rgba(70, 55, 90, 0.18);
+    background: rgba(255, 253, 248, 0.75); border-radius: 20px;
+    padding: 15px 8px; box-shadow: 0 6px 18px rgba(70, 55, 90, 0.22);
   }
   .music-volume-panel input[type="range"] {
     writing-mode: vertical-lr; direction: rtl;
-    width: 3px; height: 40px; accent-color: var(--c-pin); cursor: pointer;
+    width: 8px; height: 100px; accent-color: var(--c-pin); cursor: pointer;
+  }
+  /* Corner-anchored fixed UI (unlike nav.tabbar's center anchor, which lines
+     up with the viewport's center automatically) needs an explicit offset at
+     this width so it lines up with the card's edge, not the wider true
+     viewport's edge. Must come after the base .music-widget rule above to
+     win the cascade at equal specificity. */
+  @media (min-width: 481px) and (max-width: 999px) {
+    .music-widget { right: calc((100vw - 480px) / 2 + 14px); }
   }
 
   /* ---- Bottom nav: frozen-glass pill, icons glow instead of framing on tap ---- */
@@ -1033,7 +1045,7 @@
     .album-modal-grid { grid-template-columns: repeat(4, 1fr); }
   }
 
-  /* ---- Desktop/web view: floating icon-only nav pill on the right + a wider,
+  /* ---- Desktop/web view: floating icon-only nav pill on the left + a wider,
      multi-column layout. Placed last so it wins the cascade over the 481px
      "centered phone card" rules for the properties it overrides. ---- */
   @media (min-width: 1000px) {
@@ -1043,13 +1055,6 @@
       width: 100%;
       padding-bottom: 60px;
       box-shadow: none;
-      /* Without this, .app-shell's transform (used for the 481px "phone card"
-         centering trick) becomes the containing block for position:fixed
-         descendants — which then scroll away with .app-shell's own content
-         instead of staying glued to the viewport. At this breakpoint
-         .app-shell already fills the true viewport, so dropping the
-         transform here is purely a fix, not a visual change. */
-      transform: none;
     }
 
     nav.tabbar {
