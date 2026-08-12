@@ -57,6 +57,12 @@
   html, body {
     margin: 0;
     background: #f6e9e2;
+    /* If anything (even briefly, e.g. a fixed-position widget's own box)
+       renders even 1px wider than the viewport, mobile Chrome auto-zooms out
+       to fit it — visually shrinking the whole page and revealing a strip
+       of body background down one side. This is the actual mobile-Chrome
+       fault; it never showed up in desktop-emulated testing. */
+    overflow-x: hidden;
   }
 
   body {
