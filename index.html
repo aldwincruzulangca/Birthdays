@@ -244,6 +244,7 @@
   }
   .avatar-slide.is-active { opacity: 1; }
   .avatar-dots { display: flex; justify-content: center; gap: 5px; margin: 10px 0 0; }
+  .avatar-dots[hidden] { display: none; }
   .avatar-dots .dot-sm { width: 6px; height: 6px; border-radius: 50%; background: var(--line, rgba(0,0,0,0.15)); transition: all 0.25s ease; }
   .avatar-dots .dot-sm.active { background: var(--c-pin); width: 16px; border-radius: 3px; }
 
@@ -254,6 +255,7 @@
     background: rgba(0,0,0,0.55); color: #fff; border: none; border-radius: 999px;
     padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
   }
+  .banner-admin-edit[hidden] { display: none; }
   .banner-admin-edit svg { width: 14px; height: 14px; }
   .avatar-admin-edit {
     position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 3;
@@ -261,6 +263,7 @@
     background: rgba(0,0,0,0.55); color: #fff; border: none; border-radius: 999px;
     padding: 7px 12px; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
   }
+  .avatar-admin-edit[hidden] { display: none; }
   .avatar-admin-edit svg { width: 13px; height: 13px; }
 
   .img-editor-viewport {
@@ -274,6 +277,7 @@
     transform-origin: 0 0; cursor: grab; user-select: none; pointer-events: none;
   }
   .img-editor-thumb-tray { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .img-editor-thumb-tray[hidden] { display: none; }
   .img-editor-hint { font-size: 11px; color: var(--ink-soft); margin: 10px 0 0; text-align: center; }
 
   /* ---- Section headers within Details ---- */
@@ -4658,6 +4662,9 @@ var qrcode = function() {
     var btn = e.target.closest('.rsvp-admin-del');
     if (!btn) return;
     var ts = parseFloat(btn.getAttribute('data-ts'));
+    var target = (manifest.rsvps || []).find(function (r) { return r.ts === ts; });
+    var who = target ? target.name : 'this guest';
+    if (!window.confirm('Delete ' + who + '’s RSVP? This cannot be undone.')) return;
     manifest.rsvps = manifest.rsvps.filter(function (r) { return r.ts !== ts; });
     renderRsvpAdmin();
     if (isConfigured()) persistManifest().catch(function () {});
@@ -4989,6 +4996,7 @@ var qrcode = function() {
   document.getElementById('rsvpDeleteBtn').addEventListener('click', function () {
     var mine = getMyRsvp();
     if (!mine) return;
+    if (!window.confirm('Delete your RSVP? This cannot be undone.')) return;
     manifest.rsvps = manifest.rsvps.filter(function (r) { return r.ts !== mine.ts; });
     clearMyRsvp();
 
