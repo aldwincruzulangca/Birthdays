@@ -920,6 +920,35 @@
     writing-mode: vertical-lr; direction: rtl;
     width: 8px; height: 100px; accent-color: var(--c-pin); cursor: pointer;
   }
+  .music-playlist-popup {
+    position: absolute; bottom: 0; right: calc(100% + 10px);
+    width: 230px; max-height: 300px; overflow-y: auto;
+    background: rgba(255, 253, 248, 0.8); backdrop-filter: blur(14px);
+    border-radius: 16px; box-shadow: 0 10px 30px rgba(70, 55, 90, 0.3);
+    padding: 8px;
+  }
+  .music-playlist-popup[hidden] { display: none; }
+  .music-playlist-empty { font-size: 12px; color: var(--ink-soft); text-align: center; padding: 10px 6px; margin: 0; }
+  .music-track {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 8px; border-radius: 10px; cursor: pointer;
+  }
+  .music-track:hover, .music-track.is-active { background: rgba(217, 87, 122, 0.12); }
+  .music-track .playing-dot {
+    flex: none; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--c-pin); opacity: 0;
+  }
+  .music-track.is-active .playing-dot { opacity: 1; }
+  .music-track .name {
+    flex: 1; min-width: 0; font-size: 12.5px; font-weight: 700; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .music-track-del {
+    flex: none; width: 20px; height: 20px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,0.08); color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .music-track-del:hover { background: var(--c-heart); color: #fff; }
   /* Corner-anchored fixed UI (unlike nav.tabbar's center anchor, which lines
      up with the viewport's center automatically) needs an explicit offset at
      this width so it lines up with the card's edge, not the wider true
@@ -1400,6 +1429,12 @@
             <button type="button" id="videoUrlClearBtn" class="pillbtn p1">Clear</button>
           </div>
           <p class="admin-msg" id="videoUrlMsg"></p>
+
+          <label for="musicUploadInput" style="margin-top: 18px;">Background Music (up to 8 tracks)</label>
+          <div class="admin-row">
+            <input type="file" id="musicUploadInput" accept="audio/*" multiple>
+          </div>
+          <p class="admin-msg" id="musicUploadMsg"></p>
         </div>
       </div>
     </div>
@@ -1568,15 +1603,23 @@
     </div>
   </div>
 
-  <audio id="bgMusic" loop preload="none">
-    <source src="https://res.cloudinary.com/coyw7r0r/video/upload/v1786431741/ema-first-birthday/audio/ema-rainbow-bgmusic.mp3" type="audio/mpeg">
-  </audio>
+  <!-- The playlist below manages audio.src dynamically at runtime (default
+       track + admin uploads), so this element ships with no static <source>
+       and no loop attribute — looping/advancing is handled in JS instead. -->
+  <audio id="bgMusic" preload="none"></audio>
   <div class="music-widget" id="musicWidget">
     <button type="button" class="music-toggle" id="musicToggle" aria-label="Mute background music" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
     </button>
     <div class="music-volume-panel">
       <input type="range" id="musicVolumeSlider" min="0" max="100" value="45" aria-label="Music volume">
+    </div>
+    <button type="button" class="music-toggle" id="musicPlaylistToggle" aria-label="Show background music playlist" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    </button>
+    <div class="music-playlist-popup" id="musicPlaylistPopup" hidden>
+      <p class="music-playlist-empty" id="musicPlaylistEmpty">No background music yet.</p>
+      <div class="music-playlist-list" id="musicPlaylistList"></div>
     </div>
   </div>
 
@@ -3970,7 +4013,7 @@ var qrcode = function() {
 
   // Declared up here (rather than further down near persistManifest/loadManifest)
   // because the avatar renderer below reads manifest.* at definition time.
-  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', avatarUrls: [] };
+  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', avatarUrls: [], musicTracks: [] };
 
   var TURNED_ONE_SWITCH = new Date('2026-10-08T00:00:00').getTime();
   function headlinePhrase(withBang) {
@@ -3985,70 +4028,236 @@ var qrcode = function() {
     el.setAttribute('data-after-text', phrase);
   })();
 
-  /* ---- Background music: same toggle+slider pattern used on the Winfinity
-     adventure page. Starts on first user interaction (autoplay-with-sound is
-     blocked until then), volume/mute persist across visits. ---- */
-  (function () {
-    var audio = document.getElementById('bgMusic');
-    var toggle = document.getElementById('musicToggle');
-    var slider = document.getElementById('musicVolumeSlider');
-    var VOL_KEY = 'emaMusicVolume';
-    var MUTED_KEY = 'emaMusicMuted';
+  /* ---- Background music: a default track plus up to 8 admin-uploaded ones,
+     playing continuously and looping back to the first after the last.
+     Starts on first user interaction (autoplay-with-sound is blocked until
+     then); volume/mute persist across visits. Kept at top-level scope (not
+     wrapped in its own IIFE) so loadManifest() can call rebuildPlaylist(). ---- */
+  var bgMusicAudio = document.getElementById('bgMusic');
+  var musicToggleBtn = document.getElementById('musicToggle');
+  var musicVolumeSlider = document.getElementById('musicVolumeSlider');
+  var musicPlaylistToggleBtn = document.getElementById('musicPlaylistToggle');
+  var musicPlaylistPopup = document.getElementById('musicPlaylistPopup');
+  var musicPlaylistEmpty = document.getElementById('musicPlaylistEmpty');
+  var musicPlaylistList = document.getElementById('musicPlaylistList');
+  var MUSIC_VOL_KEY = 'emaMusicVolume';
+  var MUSIC_MUTED_KEY = 'emaMusicMuted';
+  var MAX_MUSIC_TRACKS = 8;
+  var DEFAULT_TRACK = { url: 'https://res.cloudinary.com/coyw7r0r/video/upload/v1786431741/ema-first-birthday/audio/ema-rainbow-bgmusic.mp3', name: 'Original Theme' };
 
-    var ICON_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
-    var ICON_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+  var MUSIC_ICON_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+  var MUSIC_ICON_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
 
-    var savedVolume = parseInt(localStorage.getItem(VOL_KEY), 10);
-    if (isNaN(savedVolume)) savedVolume = 45;
-    var muted = localStorage.getItem(MUTED_KEY) === '1';
+  var musicSavedVolume = parseInt(localStorage.getItem(MUSIC_VOL_KEY), 10);
+  if (isNaN(musicSavedVolume)) musicSavedVolume = 45;
+  var musicMuted = localStorage.getItem(MUSIC_MUTED_KEY) === '1';
+  musicVolumeSlider.value = musicSavedVolume;
+  bgMusicAudio.volume = musicSavedVolume / 100;
+  bgMusicAudio.muted = musicMuted;
 
-    slider.value = savedVolume;
-    audio.volume = savedVolume / 100;
-    audio.muted = muted;
+  var playlist = [];
+  var currentTrackIndex = 0;
+  var musicStarted = false;
+  var musicHasInteracted = false;
 
-    function updateToggleUI() {
-      toggle.innerHTML = muted ? ICON_OFF : ICON_ON;
-      toggle.classList.toggle('is-muted', muted);
-      toggle.setAttribute('aria-pressed', String(muted));
-      toggle.setAttribute('aria-label', muted ? 'Unmute background music' : 'Mute background music');
+  function updateMusicToggleUI() {
+    musicToggleBtn.innerHTML = musicMuted ? MUSIC_ICON_OFF : MUSIC_ICON_ON;
+    musicToggleBtn.classList.toggle('is-muted', musicMuted);
+    musicToggleBtn.setAttribute('aria-pressed', String(musicMuted));
+    musicToggleBtn.setAttribute('aria-label', musicMuted ? 'Unmute background music' : 'Mute background music');
+  }
+  updateMusicToggleUI();
+
+  function playMusic() { bgMusicAudio.play().catch(function () {}); }
+
+  function loadCurrentTrack(autoplay) {
+    if (!playlist.length) return;
+    bgMusicAudio.src = playlist[currentTrackIndex].url;
+    bgMusicAudio.load();
+    if (autoplay) playMusic();
+    renderPlaylistUI();
+  }
+
+  function tryStartMusic() {
+    if (musicStarted || !playlist.length) return;
+    musicStarted = true;
+    loadCurrentTrack(!musicMuted);
+  }
+  ['pointerdown', 'keydown', 'touchstart'].forEach(function (evt) {
+    document.addEventListener(evt, function () { musicHasInteracted = true; tryStartMusic(); }, { passive: true });
+  });
+
+  function playNextTrack() {
+    if (!playlist.length) return;
+    currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
+    loadCurrentTrack(true);
+  }
+  bgMusicAudio.addEventListener('ended', playNextTrack);
+
+  function selectTrack(i) {
+    currentTrackIndex = i;
+    musicStarted = true;
+    if (musicMuted) {
+      musicMuted = false;
+      localStorage.setItem(MUSIC_MUTED_KEY, '0');
+      bgMusicAudio.muted = false;
+      updateMusicToggleUI();
     }
-    updateToggleUI();
+    loadCurrentTrack(true);
+  }
 
-    function play() { audio.play().catch(function () {}); }
-
-    var started = false;
-    function tryStart() {
-      if (started) return;
-      started = true;
-      audio.load();
-      if (!muted) play();
-    }
-    ['pointerdown', 'keydown', 'touchstart'].forEach(function (evt) {
-      document.addEventListener(evt, tryStart, { once: true, passive: true });
-    });
-
-    toggle.addEventListener('click', function () {
-      muted = !muted;
-      localStorage.setItem(MUTED_KEY, muted ? '1' : '0');
-      audio.muted = muted;
-      updateToggleUI();
-      if (!muted) { tryStart(); play(); }
-    });
-
-    slider.addEventListener('input', function () {
-      var v = parseInt(slider.value, 10);
-      localStorage.setItem(VOL_KEY, String(v));
-      audio.volume = v / 100;
-      if (v > 0 && muted) {
-        muted = false;
-        localStorage.setItem(MUTED_KEY, '0');
-        audio.muted = false;
-        updateToggleUI();
-        tryStart();
-        play();
+  function renderPlaylistUI() {
+    musicPlaylistList.innerHTML = '';
+    musicPlaylistEmpty.hidden = !!playlist.length;
+    var admin = isAdminUnlocked();
+    playlist.forEach(function (track, i) {
+      var row = document.createElement('div');
+      row.className = 'music-track' + (i === currentTrackIndex && musicStarted ? ' is-active' : '');
+      var dot = document.createElement('span');
+      dot.className = 'playing-dot';
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = track.name || ('Track ' + (i + 1));
+      row.appendChild(dot);
+      row.appendChild(name);
+      row.addEventListener('click', function () { selectTrack(i); });
+      // The default baked-in track can't be removed — it isn't part of manifest.musicTracks.
+      if (admin && !(DEFAULT_TRACK && track.url === DEFAULT_TRACK.url)) {
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'music-track-del';
+        del.textContent = '×';
+        del.setAttribute('aria-label', 'Remove this track');
+        del.addEventListener('click', function (e) {
+          e.stopPropagation();
+          manifest.musicTracks = (manifest.musicTracks || []).filter(function (t) { return t.url !== track.url; });
+          rebuildPlaylist();
+          if (isConfigured()) persistManifest().catch(function () {});
+        });
+        row.appendChild(del);
       }
+      musicPlaylistList.appendChild(row);
     });
-  })();
+  }
+
+  function rebuildPlaylist() {
+    var currentUrl = playlist[currentTrackIndex] && playlist[currentTrackIndex].url;
+    playlist = [];
+    if (DEFAULT_TRACK) playlist.push(DEFAULT_TRACK);
+    (manifest.musicTracks || []).forEach(function (t) { playlist.push(t); });
+    var keepIdx = playlist.findIndex(function (t) { return t.url === currentUrl; });
+    currentTrackIndex = keepIdx !== -1 ? keepIdx : 0;
+    renderPlaylistUI();
+    if (musicHasInteracted) tryStartMusic();
+  }
+  rebuildPlaylist();
+
+  musicToggleBtn.addEventListener('click', function () {
+    musicMuted = !musicMuted;
+    localStorage.setItem(MUSIC_MUTED_KEY, musicMuted ? '1' : '0');
+    bgMusicAudio.muted = musicMuted;
+    updateMusicToggleUI();
+    if (!musicMuted) { tryStartMusic(); playMusic(); }
+  });
+
+  musicVolumeSlider.addEventListener('input', function () {
+    var v = parseInt(musicVolumeSlider.value, 10);
+    localStorage.setItem(MUSIC_VOL_KEY, String(v));
+    bgMusicAudio.volume = v / 100;
+    if (v > 0 && musicMuted) {
+      musicMuted = false;
+      localStorage.setItem(MUSIC_MUTED_KEY, '0');
+      bgMusicAudio.muted = false;
+      updateMusicToggleUI();
+      tryStartMusic();
+      playMusic();
+    }
+  });
+
+  musicPlaylistToggleBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    musicPlaylistPopup.hidden = !musicPlaylistPopup.hidden;
+    musicPlaylistToggleBtn.setAttribute('aria-pressed', String(!musicPlaylistPopup.hidden));
+  });
+  document.addEventListener('click', function (e) {
+    if (!musicPlaylistPopup.hidden && !musicPlaylistPopup.contains(e.target) && e.target !== musicPlaylistToggleBtn) {
+      musicPlaylistPopup.hidden = true;
+      musicPlaylistToggleBtn.setAttribute('aria-pressed', 'false');
+    }
+  });
+
+  function uploadOneAudioToCloudinary(file, slug) {
+    var form = new FormData();
+    form.append('file', file);
+    form.append('upload_preset', GALLERY_CONFIG.uploadPreset);
+    form.append('folder', 'ema-first-birthday/' + slug);
+    return fetch('https://api.cloudinary.com/v1_1/' + GALLERY_CONFIG.cloudName + '/video/upload', {
+      method: 'POST',
+      body: form
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.secure_url) throw new Error(data.error && data.error.message || 'Upload failed');
+        return data.secure_url;
+      });
+  }
+
+  document.getElementById('musicUploadInput').addEventListener('change', function () {
+    var input = this;
+    var files = input.files ? Array.prototype.slice.call(input.files) : [];
+    var msg = document.getElementById('musicUploadMsg');
+    input.value = '';
+    if (!files.length) return;
+    if (!isConfigured()) {
+      msg.textContent = 'Upload isn’t wired up yet.';
+      msg.className = 'admin-msg err';
+      return;
+    }
+    var existingCount = (manifest.musicTracks || []).length;
+    var remaining = MAX_MUSIC_TRACKS - existingCount;
+    if (remaining <= 0) {
+      msg.textContent = 'Already at the max of ' + MAX_MUSIC_TRACKS + ' tracks — remove one first.';
+      msg.className = 'admin-msg err';
+      return;
+    }
+    var skipped = 0;
+    if (files.length > remaining) {
+      skipped = files.length - remaining;
+      files = files.slice(0, remaining);
+    }
+    var uploaded = 0, failed = 0;
+    function uploadNext(i) {
+      if (i >= files.length) {
+        if (!manifest.musicTracks) manifest.musicTracks = [];
+        var p = isConfigured() ? persistManifest() : Promise.resolve();
+        return p.then(function () {
+          var skipNote = skipped ? (' (' + skipped + ' skipped — ' + MAX_MUSIC_TRACKS + ' track max)') : '';
+          if (uploaded && !failed) {
+            msg.textContent = 'Added ' + uploaded + (uploaded === 1 ? ' track' : ' tracks') + '!' + skipNote;
+            msg.className = skipNote ? 'admin-msg err' : 'admin-msg ok';
+          } else if (uploaded) {
+            msg.textContent = 'Added ' + uploaded + ', but ' + failed + ' failed.' + skipNote;
+            msg.className = 'admin-msg err';
+          } else {
+            msg.textContent = 'Upload failed for all tracks.' + skipNote;
+            msg.className = 'admin-msg err';
+          }
+          rebuildPlaylist();
+        });
+      }
+      msg.textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + '…';
+      msg.className = 'admin-msg';
+      return uploadOneAudioToCloudinary(files[i], 'music')
+        .then(function (url) {
+          uploaded++;
+          if (!manifest.musicTracks) manifest.musicTracks = [];
+          manifest.musicTracks.push({ url: url, name: files[i].name.replace(/\.[^.]+$/, '') });
+        })
+        .catch(function () { failed++; })
+        .then(function () { return uploadNext(i + 1); });
+    }
+    uploadNext(0);
+  });
 
   var slideshow = document.getElementById('slideshow');
   var dotsWrap = document.getElementById('ssDots');
@@ -4597,7 +4806,8 @@ var qrcode = function() {
       celebrationLive: manifest.celebrationLive,
       videoUrl: manifest.videoUrl,
       bannerUrl: manifest.bannerUrl,
-      avatarUrls: manifest.avatarUrls
+      avatarUrls: manifest.avatarUrls,
+      musicTracks: manifest.musicTracks
     };
     return fetch('https://api.jsonbin.io/v3/b/' + GALLERY_CONFIG.jsonbinId, {
       method: 'PUT',
@@ -4683,6 +4893,7 @@ var qrcode = function() {
     document.getElementById('bannerEditBtn').hidden = false;
     document.getElementById('avatarEditBtn').hidden = false;
     if (typeof renderAvatarManageTray === 'function') renderAvatarManageTray();
+    if (typeof renderPlaylistUI === 'function') renderPlaylistUI();
   }
 
   function loadManifest() {
@@ -4714,8 +4925,10 @@ var qrcode = function() {
         manifest.videoUrl = (record && record.videoUrl) || '';
         manifest.bannerUrl = (record && record.bannerUrl) || '';
         manifest.avatarUrls = (record && Array.isArray(record.avatarUrls)) ? record.avatarUrls : [];
+        manifest.musicTracks = (record && Array.isArray(record.musicTracks)) ? record.musicTracks : [];
         applyBannerUrl();
         renderAvatar();
+        rebuildPlaylist();
         renderPhotoboothGrid();
         renderWishThread();
         renderVideoCard(manifest.videoUrl);
