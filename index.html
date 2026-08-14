@@ -957,14 +957,33 @@
   .music-track.is-track-dragging {
     opacity: 0.6; box-shadow: 0 8px 20px rgba(0,0,0,0.35); cursor: grabbing;
   }
+  .music-playlist-controls {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    border-bottom: 1px solid var(--line); padding: 8px 6px 10px; margin-bottom: 6px;
+  }
   .music-shuffle-toggle {
-    display: flex; align-items: center; gap: 6px; width: 100%;
-    background: none; border: none; border-bottom: 1px solid var(--line);
-    padding: 8px 6px 10px; margin-bottom: 6px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; flex: none;
+    background: none; border: none; padding: 0; cursor: pointer;
     font-size: 12px; font-weight: 700; color: var(--ink-soft);
   }
   .music-shuffle-toggle svg { width: 15px; height: 15px; }
   .music-shuffle-toggle[aria-pressed="true"] { color: var(--c-pin); }
+  .music-lyrics-btn {
+    flex: none; width: 24px; height: 24px; border-radius: 50%; border: none;
+    background: rgba(0, 0, 0, 0.06); color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .music-lyrics-btn svg { width: 13px; height: 13px; }
+  .music-lyrics-btn:hover { background: rgba(217, 87, 122, 0.18); color: var(--c-pin); }
+  .music-reorder-btns { display: flex; align-items: center; gap: 3px; flex: none; }
+  .music-reorder-btn {
+    flex: none; width: 22px; height: 22px; border-radius: 50%; border: none;
+    background: rgba(0, 0, 0, 0.06); color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .music-reorder-btn svg { width: 12px; height: 12px; }
+  .music-reorder-btn:hover:not(:disabled) { background: rgba(217, 87, 122, 0.18); color: var(--c-pin); }
+  .music-reorder-btn:disabled { opacity: 0.3; cursor: default; }
   /* Corner-anchored fixed UI (unlike nav.tabbar's center anchor, which lines
      up with the viewport's center automatically) needs an explicit offset at
      this width so it lines up with the card's edge, not the wider true
@@ -1646,10 +1665,23 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
     </button>
     <div class="music-playlist-popup" id="musicPlaylistPopup" hidden>
-      <button type="button" class="music-shuffle-toggle" id="musicShuffleToggle" aria-pressed="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
-        Shuffle
-      </button>
+      <div class="music-playlist-controls">
+        <button type="button" class="music-shuffle-toggle" id="musicShuffleToggle" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+          Shuffle
+        </button>
+        <button type="button" class="music-lyrics-btn" id="musicNowPlayingLyrics" aria-label="Show lyrics for the current track">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>
+        </button>
+        <div class="music-reorder-btns" id="musicReorderBtns">
+          <button type="button" class="music-reorder-btn" id="musicMoveUp" aria-label="Move current track up">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+          <button type="button" class="music-reorder-btn" id="musicMoveDown" aria-label="Move current track down">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </button>
+        </div>
+      </div>
       <p class="music-playlist-empty" id="musicPlaylistEmpty">No background music yet.</p>
       <div class="music-playlist-list" id="musicPlaylistList"></div>
     </div>
@@ -4072,6 +4104,9 @@ var qrcode = function() {
   var musicPlaylistPopup = document.getElementById('musicPlaylistPopup');
   var musicPlaylistEmpty = document.getElementById('musicPlaylistEmpty');
   var musicPlaylistList = document.getElementById('musicPlaylistList');
+  var musicReorderBtns = document.getElementById('musicReorderBtns');
+  var musicMoveUpBtn = document.getElementById('musicMoveUp');
+  var musicMoveDownBtn = document.getElementById('musicMoveDown');
   var MUSIC_VOL_KEY = 'emaMusicVolume';
   var MUSIC_MUTED_KEY = 'emaMusicMuted';
   var MUSIC_SHUFFLE_KEY = 'emaMusicShuffle';
@@ -4150,9 +4185,36 @@ var qrcode = function() {
     loadCurrentTrack(true);
   }
 
+  function updatePlaylistControlsUI() {
+    var admin = isAdminUnlocked();
+    musicReorderBtns.style.display = admin ? '' : 'none';
+    if (!admin) return;
+    var current = playlist[currentTrackIndex];
+    var isDefault = !!(DEFAULT_TRACK && current && current.url === DEFAULT_TRACK.url);
+    var tracks = manifest.musicTracks || [];
+    var idx = (!current || isDefault) ? -1 : tracks.findIndex(function (t) { return t.url === current.url; });
+    musicMoveUpBtn.disabled = idx <= 0;
+    musicMoveDownBtn.disabled = idx === -1 || idx >= tracks.length - 1;
+  }
+
+  function moveCurrentTrack(direction) {
+    if (!isAdminUnlocked()) return;
+    var current = playlist[currentTrackIndex];
+    if (!current || (DEFAULT_TRACK && current.url === DEFAULT_TRACK.url)) return;
+    var tracks = manifest.musicTracks || [];
+    var idx = tracks.findIndex(function (t) { return t.url === current.url; });
+    var swapIdx = idx + direction;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= tracks.length) return;
+    var tmp = tracks[idx]; tracks[idx] = tracks[swapIdx]; tracks[swapIdx] = tmp;
+    manifest.musicTracks = tracks;
+    rebuildPlaylist();
+    if (isConfigured()) persistManifest().catch(function () {});
+  }
+
   function renderPlaylistUI() {
     musicPlaylistList.innerHTML = '';
     musicPlaylistEmpty.hidden = !!playlist.length;
+    updatePlaylistControlsUI();
     var admin = isAdminUnlocked();
     playlist.forEach(function (track, i) {
       var row = document.createElement('div');
@@ -4309,6 +4371,15 @@ var qrcode = function() {
     localStorage.setItem(MUSIC_SHUFFLE_KEY, musicShuffle ? '1' : '0');
     musicShuffleToggle.setAttribute('aria-pressed', String(musicShuffle));
   });
+
+  var musicNowPlayingLyricsBtn = document.getElementById('musicNowPlayingLyrics');
+  musicNowPlayingLyricsBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (!playlist.length) return;
+    openLyricsModal(playlist[currentTrackIndex]);
+  });
+  musicMoveUpBtn.addEventListener('click', function (e) { e.stopPropagation(); moveCurrentTrack(-1); });
+  musicMoveDownBtn.addEventListener('click', function (e) { e.stopPropagation(); moveCurrentTrack(1); });
 
   function uploadOneAudioToCloudinary(file, slug) {
     var form = new FormData();
