@@ -5169,6 +5169,14 @@ var qrcode = function() {
       guestNameDatalist.appendChild(opt);
     });
   }
+  // Whitelist gate: once the admin has saved a guest list, an RSVP name must
+  // match it exactly (case-insensitive) to be accepted. An empty list means
+  // the feature hasn't been set up yet, so nothing is restricted.
+  function isNameOnGuestList(n) {
+    if (!(manifest.guestNames || []).length) return true;
+    var target = n.trim().toLowerCase();
+    return manifest.guestNames.some(function (g) { return g.trim().toLowerCase() === target; });
+  }
   document.getElementById('guestNameListSaveBtn').addEventListener('click', function () {
     var textarea = document.getElementById('guestNameListInput');
     var msg = document.getElementById('guestNameListMsg');
@@ -5499,6 +5507,11 @@ var qrcode = function() {
       rsvpNote.className = 'rsvp-note err';
       return;
     }
+    if (!isNameOnGuestList(name)) {
+      rsvpNote.textContent = 'That name isn’t on the guest list — please pick it from the suggestions as you type, or contact the host.';
+      rsvpNote.className = 'rsvp-note err';
+      return;
+    }
 
     rsvpNote.textContent = 'Sending…';
     rsvpNote.className = 'rsvp-note';
@@ -5570,6 +5583,11 @@ var qrcode = function() {
     var newName = editGuestName.value.trim();
     if (!newName) {
       rsvpEditMsg.textContent = 'Name can’t be empty.';
+      rsvpEditMsg.className = 'rsvp-note err';
+      return;
+    }
+    if (!isNameOnGuestList(newName)) {
+      rsvpEditMsg.textContent = 'That name isn’t on the guest list — please pick it from the suggestions as you type, or contact the host.';
       rsvpEditMsg.className = 'rsvp-note err';
       return;
     }
