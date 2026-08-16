@@ -1327,7 +1327,7 @@
       <form action="https://formspree.io/f/REPLACE_WITH_YOUR_FORM_ID" method="POST" id="rsvpForm">
         <div class="field">
           <label for="guestName">Your Name</label>
-          <input type="text" id="guestName" name="guestName" placeholder="Enter your name" list="guestNameDatalist" autocomplete="off" required>
+          <input type="text" id="guestName" name="guestName" placeholder="Enter your name" list="guestNameDatalist" autocomplete="off">
           <datalist id="guestNameDatalist"></datalist>
         </div>
         <div class="field">
@@ -5494,7 +5494,11 @@ var qrcode = function() {
     var contact = document.getElementById('guestContact').value.trim();
     var extra = mainGuestCounter.get();
 
-    if (!name) return;
+    if (!name) {
+      rsvpNote.textContent = 'Please enter your name.';
+      rsvpNote.className = 'rsvp-note err';
+      return;
+    }
 
     rsvpNote.textContent = 'Sending…';
     rsvpNote.className = 'rsvp-note';
