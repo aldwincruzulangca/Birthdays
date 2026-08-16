@@ -1030,6 +1030,31 @@
   }
   nav.tabbar a:focus-visible { outline: 2px solid var(--c-pin); outline-offset: 2px; }
 
+  /* ---- Offline-access consent bar ---- */
+  .offline-consent-bar {
+    position: fixed;
+    left: 50%;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: min(360px, calc(100% - 32px));
+    background: rgba(255, 253, 248, 0.94);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border-radius: 18px;
+    padding: 14px 16px;
+    box-shadow: 0 10px 30px var(--shadow), 0 0 0 1px rgba(255, 255, 255, 0.45) inset;
+    z-index: 20;
+  }
+  .offline-consent-bar[hidden] { display: none; }
+  .offline-consent-bar p { margin: 0 0 10px; font-size: 12.5px; color: var(--ink); line-height: 1.4; }
+  .offline-consent-actions { display: flex; gap: 8px; }
+  .offline-consent-actions .pillbtn { flex: 1; font-size: 12px; padding: 8px 10px; }
+  .offline-toggle-link {
+    display: block; margin-top: 6px; background: none; border: none;
+    color: var(--ink-soft); font-size: 11px; text-decoration: underline;
+    cursor: pointer; font-family: inherit; padding: 0;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .slide { transition: none; }
     .sparkle { animation: none; opacity: 0.7; }
@@ -1696,6 +1721,14 @@
     </div>
   </div>
 
+  <div class="offline-consent-bar" id="offlineConsentBar" hidden>
+    <p>Want this page to work offline too? We'll save what you've viewed so it still loads without signal.</p>
+    <div class="offline-consent-actions">
+      <button type="button" class="pillbtn p1" id="offlineConsentNo">No thanks</button>
+      <button type="button" class="pillbtn p3" id="offlineConsentYes">Yes, save offline</button>
+    </div>
+  </div>
+
   <section class="closing-card">
     <button type="button" class="share-btn" id="shareBtn" aria-label="Share this invitation">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>
@@ -1757,7 +1790,10 @@
     <p class="qr-contact-note">Contact mobile: 09762373212 / 09153703821 &middot; email: aldwincruzulangca@gmail.com if you wish to acquire the same Occasion Digital Invitation.</p>
   </section>
 
-  <footer class="sig">This invitation is up through October 11, 2027.</footer>
+  <footer class="sig">
+    This invitation is up through October 11, 2027.
+    <button type="button" class="offline-toggle-link" id="offlineToggleLink" hidden></button>
+  </footer>
 </div>
 
 <nav class="tabbar" aria-label="Quick navigation">
@@ -1779,6 +1815,65 @@
   </a>
 </nav>
 </div>
+
+<script>
+  /* ---- Offline access: opt-in only. Nothing is cached for offline use
+     until the visitor says yes in the prompt (or via the footer toggle);
+     saying no — or turning it off later — unregisters the service worker
+     and clears whatever was cached. ---- */
+  (function () {
+    var OFFLINE_KEY = 'emaOfflineConsent';
+    var bar = document.getElementById('offlineConsentBar');
+    var yesBtn = document.getElementById('offlineConsentYes');
+    var noBtn = document.getElementById('offlineConsentNo');
+    var toggleLink = document.getElementById('offlineToggleLink');
+    var swSupported = 'serviceWorker' in navigator;
+
+    function updateToggleLabel() {
+      if (!toggleLink) return;
+      var on = localStorage.getItem(OFFLINE_KEY) === 'yes';
+      toggleLink.textContent = 'Offline access: ' + (on ? 'on (tap to turn off)' : 'off (tap to turn on)');
+    }
+
+    function enableOffline() {
+      localStorage.setItem(OFFLINE_KEY, 'yes');
+      if (swSupported) navigator.serviceWorker.register('sw.js').catch(function () {});
+      updateToggleLabel();
+    }
+
+    function disableOffline() {
+      localStorage.setItem(OFFLINE_KEY, 'no');
+      if (swSupported) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) { r.unregister(); });
+        });
+      }
+      if (window.caches) {
+        caches.keys().then(function (keys) {
+          keys.forEach(function (k) { caches.delete(k); });
+        });
+      }
+      updateToggleLabel();
+    }
+
+    if (swSupported) {
+      if (toggleLink) toggleLink.hidden = false;
+      var consent = localStorage.getItem(OFFLINE_KEY);
+      if (consent === 'yes') {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      } else if (!consent && bar) {
+        setTimeout(function () { bar.hidden = false; }, 2500);
+      }
+      updateToggleLabel();
+    }
+
+    if (yesBtn) yesBtn.addEventListener('click', function () { enableOffline(); bar.hidden = true; });
+    if (noBtn) noBtn.addEventListener('click', function () { localStorage.setItem(OFFLINE_KEY, 'no'); updateToggleLabel(); bar.hidden = true; });
+    if (toggleLink) toggleLink.addEventListener('click', function () {
+      if (localStorage.getItem(OFFLINE_KEY) === 'yes') disableOffline(); else enableOffline();
+    });
+  })();
+</script>
 
 <script>//---------------------------------------------------------------------
 //
