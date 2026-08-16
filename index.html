@@ -563,6 +563,11 @@
     color: var(--ink); background: #f7f2e9; border: 1px solid var(--line); border-radius: 999px;
   }
   .admin-row input[type="file"] { border-radius: 12px; padding: 8px 10px; }
+  .admin-row textarea {
+    flex: 1; min-width: 0; padding: 10px 13px; font-size: 13.5px; font-family: inherit;
+    color: var(--ink); background: #f7f2e9; border: 1px solid var(--line); border-radius: 14px;
+    resize: vertical;
+  }
   .admin-row select { border-radius: 999px; }
   .admin-msg { font-size: 11.5px; color: var(--ink-soft); margin: 10px 0 0; min-height: 14px; }
   .admin-msg.err { color: var(--c-heart); }
@@ -1308,6 +1313,12 @@
       <div class="rsvp-admin-list" id="rsvpAdminList" hidden>
         <p class="rsvp-admin-total" id="rsvpTotal">0 guests attending</p>
         <div class="rsvp-admin-rows" id="rsvpRows"></div>
+        <label for="guestNameListInput" style="display:block; margin-top: 14px; font-size: 11.5px; font-weight: 700; color: var(--ink-soft);">Guest Name List (powers the autocomplete below — one name per line, not shown to guests)</label>
+        <div class="admin-row" style="margin-top: 6px; align-items: flex-start;">
+          <textarea id="guestNameListInput" rows="4" placeholder="Juan Dela Cruz&#10;Maria Santos"></textarea>
+        </div>
+        <button type="button" class="pillbtn p3" id="guestNameListSaveBtn" style="margin-top: 8px; width: 100%;">Save Name List</button>
+        <p class="admin-msg" id="guestNameListMsg"></p>
       </div>
       <div class="sub-head">
         <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>
@@ -1316,7 +1327,8 @@
       <form action="https://formspree.io/f/REPLACE_WITH_YOUR_FORM_ID" method="POST" id="rsvpForm">
         <div class="field">
           <label for="guestName">Your Name</label>
-          <input type="text" id="guestName" name="guestName" placeholder="Enter your name" required>
+          <input type="text" id="guestName" name="guestName" placeholder="Enter your name" list="guestNameDatalist" autocomplete="off" required>
+          <datalist id="guestNameDatalist"></datalist>
         </div>
         <div class="field">
           <label for="guestContact">Email or Mobile Number (optional)</label>
@@ -1356,7 +1368,7 @@
       <div class="rsvp-edit-panel" id="rsvpEditPanel" hidden>
         <div class="field">
           <label for="editGuestName">Your Name</label>
-          <input type="text" id="editGuestName">
+          <input type="text" id="editGuestName" list="guestNameDatalist" autocomplete="off">
         </div>
         <div class="field">
           <label>Additional Guests <span class="counter-max-hint">(up to 3, on top of you)</span></label>
@@ -4174,7 +4186,7 @@ var qrcode = function() {
 
   // Declared up here (rather than further down near persistManifest/loadManifest)
   // because the avatar renderer below reads manifest.* at definition time.
-  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', bannerType: 'image', bannerVideos: [], avatarUrls: [], musicTracks: [] };
+  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', bannerType: 'image', bannerVideos: [], avatarUrls: [], musicTracks: [], guestNames: [] };
 
   var TURNED_ONE_SWITCH = new Date('2026-10-08T00:00:00').getTime();
   function headlinePhrase(withBang) {
@@ -5123,6 +5135,7 @@ var qrcode = function() {
       bannerUrl: manifest.bannerUrl,
       bannerType: manifest.bannerType,
       bannerVideos: manifest.bannerVideos,
+      guestNames: manifest.guestNames,
       avatarUrls: manifest.avatarUrls,
       musicTracks: manifest.musicTracks
     };
@@ -5142,6 +5155,48 @@ var qrcode = function() {
   var rsvpAdminList = document.getElementById('rsvpAdminList');
   var rsvpTotal = document.getElementById('rsvpTotal');
   var rsvpRows = document.getElementById('rsvpRows');
+
+  /* ---- Guest name list: admin pastes a roster (one name per line); guests
+     never see the list itself, only matching suggestions in the datalist
+     as they type in the "Your Name" field. ---- */
+  var guestNameDatalist = document.getElementById('guestNameDatalist');
+  function renderGuestNameDatalist() {
+    if (!guestNameDatalist) return;
+    guestNameDatalist.innerHTML = '';
+    (manifest.guestNames || []).forEach(function (name) {
+      var opt = document.createElement('option');
+      opt.value = name;
+      guestNameDatalist.appendChild(opt);
+    });
+  }
+  document.getElementById('guestNameListSaveBtn').addEventListener('click', function () {
+    var textarea = document.getElementById('guestNameListInput');
+    var msg = document.getElementById('guestNameListMsg');
+    var seen = {};
+    var names = textarea.value.split('\n')
+      .map(function (n) { return n.trim(); })
+      .filter(function (n) {
+        if (!n || seen[n.toLowerCase()]) return false;
+        seen[n.toLowerCase()] = true;
+        return true;
+      });
+    manifest.guestNames = names;
+    renderGuestNameDatalist();
+    if (!isConfigured()) {
+      msg.textContent = 'Saved on this device (JSONBin isn’t configured).';
+      msg.className = 'admin-msg';
+      return;
+    }
+    msg.textContent = 'Saving…';
+    msg.className = 'admin-msg';
+    persistManifest().then(function () {
+      msg.textContent = 'Saved ' + names.length + (names.length === 1 ? ' name!' : ' names!');
+      msg.className = 'admin-msg ok';
+    }).catch(function () {
+      msg.textContent = 'Saved here, but couldn’t reach the shared list.';
+      msg.className = 'admin-msg err';
+    });
+  });
 
   // Older RSVPs (pre-counter) only have a "+N" plusOnes string with no adult/child
   // split — treat those as all-adult so totals still add up correctly.
@@ -5203,6 +5258,7 @@ var qrcode = function() {
   function revealAdminExtras() {
     rsvpAdminList.hidden = false;
     renderRsvpAdmin();
+    document.getElementById('guestNameListInput').value = (manifest.guestNames || []).join('\n');
     applyCelebrationState();
     renderCoverPicker(parseInt(uploadMonth.value, 10) || 0);
     renderWishThread();
@@ -5248,6 +5304,8 @@ var qrcode = function() {
         }
         manifest.avatarUrls = (record && Array.isArray(record.avatarUrls)) ? record.avatarUrls : [];
         manifest.musicTracks = (record && Array.isArray(record.musicTracks)) ? record.musicTracks : [];
+        manifest.guestNames = (record && Array.isArray(record.guestNames)) ? record.guestNames : [];
+        renderGuestNameDatalist();
         applyBannerUrl();
         renderAvatar();
         rebuildPlaylist();
