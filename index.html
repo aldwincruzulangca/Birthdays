@@ -957,6 +957,7 @@
   .music-track.is-track-dragging {
     opacity: 0.6; box-shadow: 0 8px 20px rgba(0,0,0,0.35); cursor: grabbing;
   }
+  .banner-video-list { max-height: 220px; overflow-y: auto; margin-top: 8px; }
   .music-playlist-controls {
     display: flex; align-items: center; justify-content: space-between; gap: 6px;
     border-bottom: 1px solid var(--line); padding: 8px 6px 10px; margin-bottom: 6px;
@@ -1233,7 +1234,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
       Edit Banner
     </button>
-    <input type="file" id="bannerFileInput" accept="image/*,video/*" hidden>
+    <input type="file" id="bannerFileInput" accept="image/*" hidden>
   </section>
 
   <div class="intro">
@@ -1471,6 +1472,13 @@
             <input type="file" id="musicUploadInput" accept="audio/*" multiple>
           </div>
           <p class="admin-msg" id="musicUploadMsg"></p>
+
+          <label for="bannerVideoUploadInput" style="margin-top: 18px;">Banner Video Clips (up to 8, 10MB each — plays as a loop instead of the banner photo)</label>
+          <div class="admin-row">
+            <input type="file" id="bannerVideoUploadInput" accept="video/*" multiple>
+          </div>
+          <p class="admin-msg" id="bannerVideoUploadMsg"></p>
+          <div class="music-playlist-list banner-video-list" id="bannerVideoList"></div>
         </div>
       </div>
     </div>
@@ -4078,7 +4086,7 @@ var qrcode = function() {
 
   // Declared up here (rather than further down near persistManifest/loadManifest)
   // because the avatar renderer below reads manifest.* at definition time.
-  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', bannerType: 'image', avatarUrls: [], musicTracks: [] };
+  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', bannerType: 'image', bannerVideos: [], avatarUrls: [], musicTracks: [] };
 
   var TURNED_ONE_SWITCH = new Date('2026-10-08T00:00:00').getTime();
   function headlinePhrase(withBang) {
@@ -5026,6 +5034,7 @@ var qrcode = function() {
       videoUrl: manifest.videoUrl,
       bannerUrl: manifest.bannerUrl,
       bannerType: manifest.bannerType,
+      bannerVideos: manifest.bannerVideos,
       avatarUrls: manifest.avatarUrls,
       musicTracks: manifest.musicTracks
     };
@@ -5114,6 +5123,7 @@ var qrcode = function() {
     document.getElementById('avatarEditBtn').hidden = false;
     if (typeof renderAvatarManageTray === 'function') renderAvatarManageTray();
     if (typeof renderPlaylistUI === 'function') renderPlaylistUI();
+    if (typeof renderBannerVideoList === 'function') renderBannerVideoList();
   }
 
   function loadManifest() {
@@ -5145,6 +5155,10 @@ var qrcode = function() {
         manifest.videoUrl = (record && record.videoUrl) || '';
         manifest.bannerUrl = (record && record.bannerUrl) || '';
         manifest.bannerType = (record && record.bannerType) || 'image';
+        manifest.bannerVideos = (record && Array.isArray(record.bannerVideos)) ? record.bannerVideos : [];
+        if (manifest.bannerType === 'video' && !manifest.bannerVideos.length && manifest.bannerUrl) {
+          manifest.bannerVideos = [{ url: manifest.bannerUrl }];
+        }
         manifest.avatarUrls = (record && Array.isArray(record.avatarUrls)) ? record.avatarUrls : [];
         manifest.musicTracks = (record && Array.isArray(record.musicTracks)) ? record.musicTracks : [];
         applyBannerUrl();
@@ -5873,61 +5887,237 @@ var qrcode = function() {
   });
 
   /* ---- Banner: admin can replace the top photo, positioned via the editor,
-     or upload a short video clip (uploaded as-is, no crop step). ---- */
+     or upload a rotation of short video clips that play in sequence and
+     loop — managed the same way as the background music playlist (long-press
+     a clip to drag-reorder, tap to jump to it, × to remove). ---- */
   var bannerImgEl = document.getElementById('bannerImg');
   var bannerVideoEl = document.getElementById('bannerVideo');
   var bannerEditBtn = document.getElementById('bannerEditBtn');
   var bannerFileInput = document.getElementById('bannerFileInput');
+  var bannerVideoListEl = document.getElementById('bannerVideoList');
+  var MAX_BANNER_VIDEOS = 8;
   var BANNER_VIDEO_MAX_BYTES = 10 * 1024 * 1024;
 
-  function applyBannerUrl() {
-    if (!manifest.bannerUrl) return;
-    if (manifest.bannerType === 'video') {
-      bannerVideoEl.src = manifest.bannerUrl;
-      bannerVideoEl.hidden = false;
-      bannerImgEl.hidden = true;
-      bannerVideoEl.play().catch(function () {});
-    } else {
-      bannerImgEl.src = manifest.bannerUrl;
-      bannerImgEl.hidden = false;
-      bannerVideoEl.hidden = true;
-      bannerVideoEl.removeAttribute('src');
-    }
-  }
+  var bannerVideoPlaylist = [];
+  var bannerVideoIndex = 0;
 
-  function uploadBannerVideo(file) {
-    if (!isConfigured()) { alert('Not configured.'); return; }
-    if (file.size > BANNER_VIDEO_MAX_BYTES) {
-      alert('That video is too big — please keep banner clips under 10MB.');
+  function applyBannerUrl() {
+    if (manifest.bannerType === 'video') {
+      rebuildBannerVideoPlaylist();
       return;
     }
-    bannerEditBtn.disabled = true;
-    var form = new FormData();
-    form.append('file', file);
-    form.append('upload_preset', GALLERY_CONFIG.uploadPreset);
-    form.append('folder', 'ema-first-birthday/banner');
-    fetch('https://api.cloudinary.com/v1_1/' + GALLERY_CONFIG.cloudName + '/video/upload', {
-      method: 'POST',
-      body: form
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (!data.secure_url) throw new Error(data.error && data.error.message || 'Upload failed');
-        manifest.bannerUrl = data.secure_url;
-        manifest.bannerType = 'video';
-        applyBannerUrl();
-        return persistManifest();
-      })
-      .catch(function () { alert('Video upload failed — try again.'); })
-      .then(function () { bannerEditBtn.disabled = false; });
+    if (!manifest.bannerUrl) return;
+    bannerImgEl.src = manifest.bannerUrl;
+    bannerImgEl.hidden = false;
+    bannerVideoEl.hidden = true;
+    bannerVideoEl.removeAttribute('src');
   }
+
+  function loadCurrentBannerVideo(autoplay) {
+    if (!bannerVideoPlaylist.length) {
+      bannerVideoEl.hidden = true;
+      bannerVideoEl.removeAttribute('src');
+      bannerImgEl.hidden = false;
+      renderBannerVideoList();
+      return;
+    }
+    bannerVideoEl.src = bannerVideoPlaylist[bannerVideoIndex].url;
+    bannerVideoEl.hidden = false;
+    bannerImgEl.hidden = true;
+    if (autoplay) bannerVideoEl.play().catch(function () {});
+    renderBannerVideoList();
+  }
+
+  function playNextBannerVideo() {
+    if (!bannerVideoPlaylist.length) return;
+    bannerVideoIndex = (bannerVideoIndex + 1) % bannerVideoPlaylist.length;
+    loadCurrentBannerVideo(true);
+  }
+  bannerVideoEl.addEventListener('ended', playNextBannerVideo);
+
+  function selectBannerVideo(i) {
+    bannerVideoIndex = i;
+    loadCurrentBannerVideo(true);
+  }
+
+  function rebuildBannerVideoPlaylist() {
+    var currentUrl = bannerVideoPlaylist[bannerVideoIndex] && bannerVideoPlaylist[bannerVideoIndex].url;
+    bannerVideoPlaylist = (manifest.bannerVideos || []).slice();
+    var keepIdx = bannerVideoPlaylist.findIndex(function (v) { return v.url === currentUrl; });
+    bannerVideoIndex = keepIdx !== -1 ? keepIdx : 0;
+    loadCurrentBannerVideo(true);
+  }
+
+  function renderBannerVideoList() {
+    if (!bannerVideoListEl) return;
+    bannerVideoListEl.innerHTML = '';
+    var admin = isAdminUnlocked();
+    (manifest.bannerVideos || []).forEach(function (clip, i) {
+      var row = document.createElement('div');
+      row.className = 'music-track' + (manifest.bannerType === 'video' && i === bannerVideoIndex ? ' is-active' : '');
+      row.dataset.url = clip.url;
+      var dot = document.createElement('span');
+      dot.className = 'playing-dot';
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = 'Clip ' + (i + 1);
+      row.appendChild(dot);
+      row.appendChild(name);
+
+      // Same long-press-then-drag gesture as the music playlist: a quick
+      // tap jumps to the clip, holding 2s then moving reorders it, so
+      // neither one steals a normal list scroll.
+      var pressTimer = null, longPressed = false, dragging = false, startX = 0, startY = 0, pointerId = null;
+      row.addEventListener('pointerdown', function (e) {
+        longPressed = false;
+        dragging = false;
+        startX = e.clientX;
+        startY = e.clientY;
+        pointerId = e.pointerId;
+        pressTimer = setTimeout(function () {
+          longPressed = true;
+          row.classList.add('is-holdable');
+        }, 2000);
+      });
+      row.addEventListener('pointermove', function (e) {
+        if (e.pointerId !== pointerId) return;
+        if (!longPressed) {
+          if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+          }
+          return;
+        }
+        if (!dragging) {
+          dragging = true;
+          row.classList.remove('is-holdable');
+          row.classList.add('is-track-dragging');
+          try { row.setPointerCapture(pointerId); } catch (err) {}
+        }
+        var target = document.elementFromPoint(e.clientX, e.clientY);
+        var targetRow = target && target.closest ? target.closest('.music-track') : null;
+        if (targetRow && targetRow !== row && targetRow.parentNode === bannerVideoListEl) {
+          var rows = Array.from(bannerVideoListEl.children);
+          var rowIdx = rows.indexOf(row);
+          var targetIdx = rows.indexOf(targetRow);
+          bannerVideoListEl.insertBefore(row, rowIdx < targetIdx ? targetRow.nextSibling : targetRow);
+        }
+      });
+      function endPress(e) {
+        if (e.pointerId !== pointerId) return;
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+        row.classList.remove('is-holdable');
+        if (dragging) {
+          row.classList.remove('is-track-dragging');
+          var newOrder = Array.from(bannerVideoListEl.children).map(function (el) { return el.dataset.url; });
+          manifest.bannerVideos = newOrder
+            .map(function (url) { return (manifest.bannerVideos || []).find(function (v) { return v.url === url; }); })
+            .filter(Boolean);
+          rebuildBannerVideoPlaylist();
+          if (isConfigured()) persistManifest().catch(function () {});
+        }
+        pointerId = null;
+      }
+      row.addEventListener('pointerup', endPress);
+      row.addEventListener('pointercancel', endPress);
+      row.addEventListener('click', function (e) {
+        if (longPressed || dragging) { e.stopPropagation(); e.preventDefault(); return; }
+        selectBannerVideo(i);
+      });
+
+      if (admin) {
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'music-track-del';
+        del.textContent = '×';
+        del.setAttribute('aria-label', 'Remove this clip');
+        del.addEventListener('click', function (e) {
+          e.stopPropagation();
+          manifest.bannerVideos = (manifest.bannerVideos || []).filter(function (v) { return v.url !== clip.url; });
+          if (!manifest.bannerVideos.length) manifest.bannerType = 'image';
+          rebuildBannerVideoPlaylist();
+          applyBannerUrl();
+          if (isConfigured()) persistManifest().catch(function () {});
+        });
+        row.appendChild(del);
+      }
+      bannerVideoListEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('bannerVideoUploadInput').addEventListener('change', function () {
+    var input = this;
+    var files = input.files ? Array.prototype.slice.call(input.files) : [];
+    var msg = document.getElementById('bannerVideoUploadMsg');
+    input.value = '';
+    if (!files.length) return;
+    if (!isConfigured()) {
+      msg.textContent = 'Upload isn’t wired up yet.';
+      msg.className = 'admin-msg err';
+      return;
+    }
+    var tooBig = files.filter(function (f) { return f.size > BANNER_VIDEO_MAX_BYTES; }).length;
+    files = files.filter(function (f) { return f.size <= BANNER_VIDEO_MAX_BYTES; });
+    var existingCount = (manifest.bannerVideos || []).length;
+    var remaining = MAX_BANNER_VIDEOS - existingCount;
+    var overCap = 0;
+    if (files.length > remaining) {
+      overCap = files.length - Math.max(remaining, 0);
+      files = files.slice(0, Math.max(remaining, 0));
+    }
+    if (!files.length) {
+      msg.textContent = tooBig ? 'Too big — clips must be under 10MB.' : 'Already at the max of ' + MAX_BANNER_VIDEOS + ' clips — remove one first.';
+      msg.className = 'admin-msg err';
+      return;
+    }
+    var uploaded = 0, failed = 0;
+    function uploadNext(i) {
+      if (i >= files.length) {
+        if (!manifest.bannerVideos) manifest.bannerVideos = [];
+        manifest.bannerType = 'video';
+        var p = isConfigured() ? persistManifest() : Promise.resolve();
+        return p.then(function () {
+          var note = (tooBig ? ' (' + tooBig + ' too big)' : '') + (overCap ? ' (' + overCap + ' skipped — ' + MAX_BANNER_VIDEOS + ' clip max)' : '');
+          if (uploaded && !failed) {
+            msg.textContent = 'Added ' + uploaded + (uploaded === 1 ? ' clip' : ' clips') + '!' + note;
+            msg.className = note ? 'admin-msg err' : 'admin-msg ok';
+          } else if (uploaded) {
+            msg.textContent = 'Added ' + uploaded + ', but ' + failed + ' failed.' + note;
+            msg.className = 'admin-msg err';
+          } else {
+            msg.textContent = 'Upload failed for all clips.' + note;
+            msg.className = 'admin-msg err';
+          }
+          rebuildBannerVideoPlaylist();
+        });
+      }
+      msg.textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + '…';
+      msg.className = 'admin-msg';
+      var form = new FormData();
+      form.append('file', files[i]);
+      form.append('upload_preset', GALLERY_CONFIG.uploadPreset);
+      form.append('folder', 'ema-first-birthday/banner');
+      return fetch('https://api.cloudinary.com/v1_1/' + GALLERY_CONFIG.cloudName + '/video/upload', {
+        method: 'POST',
+        body: form
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data.secure_url) throw new Error(data.error && data.error.message || 'Upload failed');
+          uploaded++;
+          if (!manifest.bannerVideos) manifest.bannerVideos = [];
+          manifest.bannerVideos.push({ url: data.secure_url });
+        })
+        .catch(function () { failed++; })
+        .then(function () { return uploadNext(i + 1); });
+    }
+    uploadNext(0);
+  });
 
   bannerEditBtn.addEventListener('click', function () { bannerFileInput.click(); });
   bannerFileInput.addEventListener('change', function () {
     var file = bannerFileInput.files && bannerFileInput.files[0];
     bannerFileInput.value = '';
     if (!file) return;
-    if (file.type.indexOf('video/') === 0) { uploadBannerVideo(file); return; }
     openImageEditor(file, {
       title: 'Edit Banner',
       shape: 'rect',
