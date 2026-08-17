@@ -302,6 +302,7 @@
   .info-pill .ico svg { width: 19px; height: 19px; }
   .info-pill.cal .ico { background: var(--c-cal-tint); color: var(--c-cal); }
   .info-pill.pin .ico { background: var(--c-pin-tint); color: var(--c-pin); }
+  .info-pill .pill-main { flex: 1; min-width: 0; }
   .info-pill .t { font-weight: 700; font-size: 14.5px; color: var(--ink); margin: 0; }
   .info-pill .d { font-size: 12.5px; color: var(--ink-soft); margin: 2px 0 0; }
   .info-pill .link {
@@ -310,6 +311,25 @@
     color: var(--c-pin); text-decoration: none;
   }
   .info-pill .link svg { width: 12px; height: 12px; }
+
+  .info-pill.cal { cursor: pointer; transition: transform 0.15s ease; }
+  .info-pill.cal:active { transform: scale(0.98); }
+  .cal-tap-hint {
+    font-size: 10.5px; font-weight: 700; color: var(--c-cal);
+    margin: 5px 0 0; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .countdown-badge:not([hidden]) {
+    flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--c-heart); color: #fff; border-radius: 14px;
+    padding: 7px 10px; min-width: 52px; line-height: 1.05;
+  }
+  .countdown-badge .cd-num {
+    font-family: 'Baloo Deco', sans-serif; font-weight: 700; font-size: 19px;
+  }
+  .countdown-badge .cd-label {
+    font-size: 8px; text-transform: uppercase; letter-spacing: 0.03em;
+    opacity: 0.92; margin-top: 1px; text-align: center;
+  }
 
   /* ---- Program ---- */
   .program-card {
@@ -337,6 +357,27 @@
   }
   .tl-what { font-size: 13.5px; font-weight: 700; color: var(--ink); margin: 0; }
   .program-note { margin-top: 14px; font-size: 11.5px; color: var(--ink-soft); }
+
+  /* ---- Gift registry ---- */
+  .gift-card {
+    background: var(--card);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 20px;
+    padding: 20px 18px;
+    margin-top: 26px;
+  }
+  .gift-note { font-size: 12.5px; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+  .gift-qr-grid { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+  .gift-qr-item { text-align: center; }
+  .gift-qr-item img {
+    width: 150px; height: 150px; object-fit: contain;
+    border-radius: 14px; border: 2px solid var(--line);
+    background: #fff; padding: 8px; display: block;
+  }
+  .gift-qr-label {
+    margin: 8px 0 0; font-weight: 700; font-size: 13px; color: var(--ink);
+  }
 
   /* ---- RSVP card ---- */
   .rsvp-card {
@@ -1343,11 +1384,16 @@
   <section class="block" id="details">
 
     <div class="info-pills" style="margin-bottom: 26px;">
-      <div class="info-pill cal">
+      <div class="info-pill cal" id="calPill" role="button" tabindex="0" aria-label="Add EMA's first birthday to your calendar">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
-        <div>
+        <div class="pill-main">
           <p class="t">Sunday, October 11, 2026</p>
           <p class="d">11:00 AM &ndash; 3:00 PM</p>
+          <p class="cal-tap-hint">Tap to add to your calendar</p>
+        </div>
+        <div class="countdown-badge" id="countdownBadge" hidden>
+          <span class="cd-num" id="countdownNum">&ndash;</span>
+          <span class="cd-label" id="countdownLabel">days to go</span>
         </div>
       </div>
       <div class="info-pill pin">
@@ -1471,6 +1517,24 @@
       <p class="program-note">Suggested flow &mdash; tell KD the real order of activities and this updates to match.</p>
     </div>
 
+    <div class="gift-card" id="giftCard" hidden>
+      <div class="sub-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+        <h2>Gift Registry</h2>
+      </div>
+      <p class="gift-note">Your presence is truly EMA's greatest gift &mdash; but if you'd like to send a little something extra, here's how:</p>
+      <div class="gift-qr-grid">
+        <div class="gift-qr-item" id="giftQrGcash" hidden>
+          <img src="" alt="GCash QR Code">
+          <p class="gift-qr-label">GCash</p>
+        </div>
+        <div class="gift-qr-item" id="giftQrMaya" hidden>
+          <img src="" alt="Maya QR Code">
+          <p class="gift-qr-label">Maya</p>
+        </div>
+      </div>
+    </div>
+
   </section>
 
   <section class="block" id="gallery">
@@ -1563,6 +1627,17 @@
           <p class="admin-msg" id="bannerVideoUploadMsg"></p>
           <div class="music-playlist-list banner-video-list" id="bannerVideoList"></div>
           <button type="button" class="pillbtn p3" id="bannerVideoApplyBtn" style="margin-top: 10px; width: 100%;">Play These Clips on Banner</button>
+
+          <label for="giftQrGcashInput" style="margin-top: 18px;">Gift Registry &ndash; GCash QR Code</label>
+          <div class="admin-row">
+            <input type="file" id="giftQrGcashInput" accept="image/*">
+          </div>
+
+          <label for="giftQrMayaInput" style="margin-top: 10px;">Gift Registry &ndash; Maya QR Code</label>
+          <div class="admin-row">
+            <input type="file" id="giftQrMayaInput" accept="image/*">
+          </div>
+          <p class="admin-msg" id="giftQrMsg"></p>
         </div>
       </div>
     </div>
@@ -4259,7 +4334,7 @@ var qrcode = function() {
 
   // Declared up here (rather than further down near persistManifest/loadManifest)
   // because the avatar renderer below reads manifest.* at definition time.
-  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', bannerType: 'image', bannerVideos: [], avatarUrls: [], musicTracks: [], guestNames: [] };
+  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', bannerType: 'image', bannerVideos: [], avatarUrls: [], musicTracks: [], guestNames: [], giftQr: { gcash: '', maya: '' } };
 
   var TURNED_ONE_SWITCH = new Date('2026-10-08T00:00:00').getTime();
   function headlinePhrase(withBang) {
@@ -5178,6 +5253,72 @@ var qrcode = function() {
   });
   sections.forEach(function (s) { if (s) io.observe(s); });
 
+  /* ---- Countdown + add-to-calendar on the date/time pill ---- */
+  (function () {
+    var EVENT_START_UTC = Date.UTC(2026, 9, 11, 3, 0, 0); // Oct 11 2026, 11:00 AM PHT (UTC+8)
+    var badge = document.getElementById('countdownBadge');
+    var num = document.getElementById('countdownNum');
+    var label = document.getElementById('countdownLabel');
+
+    function updateCountdown() {
+      var diffDays = Math.ceil((EVENT_START_UTC - Date.now()) / 86400000);
+      if (diffDays > 1) {
+        num.textContent = diffDays;
+        label.textContent = 'days to go';
+      } else if (diffDays === 1) {
+        num.textContent = '1';
+        label.textContent = 'day to go';
+      } else if (diffDays === 0) {
+        num.textContent = '✨';
+        label.textContent = "it's today!";
+      } else {
+        badge.hidden = true;
+        return;
+      }
+      badge.hidden = false;
+    }
+    updateCountdown();
+    setInterval(updateCountdown, 3600000);
+
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function icsStamp(d) {
+      return d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + 'T' +
+        pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + 'Z';
+    }
+    function addToCalendar() {
+      var ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//EMA First Birthday//Invite//EN',
+        'CALSCALE:GREGORIAN',
+        'BEGIN:VEVENT',
+        'UID:ema-first-birthday-2026@aldwincruzulangca.github.io',
+        'DTSTAMP:' + icsStamp(new Date()),
+        'DTSTART:20261011T030000Z',
+        'DTEND:20261011T070000Z',
+        'SUMMARY:EMA\'s First Birthday Celebration',
+        'DESCRIPTION:Join us as EMA turns One! Details: https://aldwincruzulangca.github.io/Birthdays/',
+        'LOCATION:Limay Multipurpose Hall\\, Limay Park\\, Limay\\, Bataan',
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+      var blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'EMA-First-Birthday.ics';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+    var calPill = document.getElementById('calPill');
+    calPill.addEventListener('click', addToCalendar);
+    calPill.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addToCalendar(); }
+    });
+  })();
+
   /* ---- Gallery admin: passcode gate + Cloudinary upload + JSONBin manifest ---- */
   var GALLERY_CONFIG = {
     cloudName: 'coyw7r0r',
@@ -5210,7 +5351,8 @@ var qrcode = function() {
       bannerVideos: manifest.bannerVideos,
       guestNames: manifest.guestNames,
       avatarUrls: manifest.avatarUrls,
-      musicTracks: manifest.musicTracks
+      musicTracks: manifest.musicTracks,
+      giftQr: manifest.giftQr
     };
     return fetch('https://api.jsonbin.io/v3/b/' + GALLERY_CONFIG.jsonbinId, {
       method: 'PUT',
@@ -5386,9 +5528,11 @@ var qrcode = function() {
         manifest.avatarUrls = (record && Array.isArray(record.avatarUrls)) ? record.avatarUrls : [];
         manifest.musicTracks = (record && Array.isArray(record.musicTracks)) ? record.musicTracks : [];
         manifest.guestNames = (record && Array.isArray(record.guestNames)) ? record.guestNames : [];
+        manifest.giftQr = (record && record.giftQr && typeof record.giftQr === 'object') ? record.giftQr : { gcash: '', maya: '' };
         renderGuestNameDatalist();
         applyBannerUrl();
         renderAvatar();
+        renderGiftCard();
         rebuildPlaylist();
         renderPhotoboothGrid();
         renderWishThread();
@@ -6417,6 +6561,44 @@ var qrcode = function() {
       }
     });
   });
+
+  /* ---- Gift registry: GCash/Maya QR codes. Uploaded as-is (no crop editor,
+     no canvas re-encode) so the QR pattern is never distorted or blurred by
+     recompression — a mis-cropped QR just doesn't scan. ---- */
+  function renderGiftCard() {
+    var card = document.getElementById('giftCard');
+    var gcashItem = document.getElementById('giftQrGcash');
+    var mayaItem = document.getElementById('giftQrMaya');
+    var qr = manifest.giftQr || {};
+    if (qr.gcash) { gcashItem.querySelector('img').src = qr.gcash; gcashItem.hidden = false; } else { gcashItem.hidden = true; }
+    if (qr.maya) { mayaItem.querySelector('img').src = qr.maya; mayaItem.hidden = false; } else { mayaItem.hidden = true; }
+    card.hidden = !(qr.gcash || qr.maya);
+  }
+
+  function handleGiftQrUpload(input, key, label) {
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      input.value = '';
+      if (!file) return;
+      var msg = document.getElementById('giftQrMsg');
+      if (!isConfigured()) return;
+      msg.textContent = 'Uploading ' + label + ' QR...';
+      msg.className = 'admin-msg';
+      uploadOneToCloudinary(file, 'gift-' + key).then(function (url) {
+        manifest.giftQr[key] = url;
+        renderGiftCard();
+        return persistManifest();
+      }).then(function () {
+        msg.textContent = label + ' QR saved!';
+        msg.className = 'admin-msg ok';
+      }).catch(function () {
+        msg.textContent = 'Upload failed — try again.';
+        msg.className = 'admin-msg err';
+      });
+    });
+  }
+  handleGiftQrUpload(document.getElementById('giftQrGcashInput'), 'gcash', 'GCash');
+  handleGiftQrUpload(document.getElementById('giftQrMayaInput'), 'maya', 'Maya');
 
   /* ---- Avatar: up to 5 photos, each individually cropped/positioned/rotated
      at upload time; 2+ photos cross-fade like a small slideshow. ---- */
