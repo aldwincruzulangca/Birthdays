@@ -8653,24 +8653,34 @@ var qrcode = function() {
     var emaItem = STICKER_LIBRARY.filter(function (s) { return s.id === 'ema'; })[0] || STICKER_LIBRARY[0];
     addSticker(emaItem, camPreviewWrap, previewStickers);
     var entry = previewStickers[previewStickers.length - 1];
-    // Map the circle guide's canvas-pixel position into the wrap's own
-    // local (unscaled) CSS space, accounting for the object-fit:contain
-    // letterbox bars around the rendered image whenever the wrap's own
-    // aspect isn't exactly the collage's 3:2 -- the near-universal case
-    // once the edit view goes full screen on a real device.
-    var boxW = camPreviewWrap.clientWidth, boxH = camPreviewWrap.clientHeight;
-    var imgRatio = camCanvas.width / camCanvas.height;
-    var renderW, renderH;
-    if (boxW / boxH > imgRatio) { renderH = boxH; renderW = renderH * imgRatio; }
-    else { renderW = boxW; renderH = renderW / imgRatio; }
-    var offsetX = (boxW - renderW) / 2, offsetY = (boxH - renderH) / 2;
-    var factor = renderW / camCanvas.width;
-    entry.state.x = offsetX + collageCircleGeom.cx * factor;
-    entry.state.y = offsetY + collageCircleGeom.cy * factor;
-    // Starts noticeably bigger than the circle guide (not fitted exactly
-    // to it), so there's obvious room to drag/pinch it down to size.
-    entry.state.scale = (collageCircleGeom.diameter * factor * 1.25) / entry.state.baseWidth;
-    applyStickerTransform(entry.wrapper, entry.state);
+    // Placing it correctly needs camCanvas's object-fit:contain layout to
+    // have actually caught up with the width/height attrs renderCollageCanvas
+    // just set moments ago -- browsers can take a couple of paint frames to
+    // re-fit a canvas after its intrinsic size changes, so measuring on the
+    // very next tick can still see the old (pre-resize) fit and place the
+    // sticker off the circle guide. Two rAFs reliably clears that.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        // Map the circle guide's canvas-pixel position into the wrap's own
+        // local (unscaled) CSS space, accounting for the object-fit:contain
+        // letterbox bars around the rendered image whenever the wrap's own
+        // aspect isn't exactly the collage's 3:2 -- the near-universal case
+        // once the edit view goes full screen on a real device.
+        var boxW = camPreviewWrap.clientWidth, boxH = camPreviewWrap.clientHeight;
+        var imgRatio = camCanvas.width / camCanvas.height;
+        var renderW, renderH;
+        if (boxW / boxH > imgRatio) { renderH = boxH; renderW = renderH * imgRatio; }
+        else { renderW = boxW; renderH = renderW / imgRatio; }
+        var offsetX = (boxW - renderW) / 2, offsetY = (boxH - renderH) / 2;
+        var factor = renderW / camCanvas.width;
+        entry.state.x = offsetX + collageCircleGeom.cx * factor;
+        entry.state.y = offsetY + collageCircleGeom.cy * factor;
+        // Starts noticeably bigger than the circle guide (not fitted exactly
+        // to it), so there's obvious room to drag/pinch it down to size.
+        entry.state.scale = (collageCircleGeom.diameter * factor * 1.25) / entry.state.baseWidth;
+        applyStickerTransform(entry.wrapper, entry.state);
+      });
+    });
   }
 
   function composeCollage() {
