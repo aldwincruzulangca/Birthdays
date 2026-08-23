@@ -640,6 +640,13 @@
   .admin-msg.err { color: var(--c-heart); }
   .admin-msg.ok { color: var(--c-pin); }
 
+  /* ---- Admin: Show/Hide Sections checklist ---- */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--ink); cursor: pointer; }
+  .toggle-row:last-child { border-bottom: none; }
+  .check-circle { appearance: none; -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card-solid); cursor: pointer; position: relative; flex-shrink: 0; margin: 0; }
+  .check-circle:checked { background: var(--c-pin); border-color: var(--c-pin); }
+  .check-circle:checked::after { content: ''; position: absolute; left: 7px; top: 3px; width: 5px; height: 10px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+
   .cover-picker-block { margin-top: 16px; }
   .cover-picker-block label { display: block; font-size: 11.5px; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px; }
   .cover-thumb {
@@ -1080,7 +1087,7 @@
      centered on the right, mirroring the desktop nav's centered-left
      placement — so it reads as "the other side" at every width and never
      competes with the banner's star badge up top. ---- */
-  .music-widget {
+  .music-widget:not([hidden]) {
     position: fixed; top: 50%; right: 14px; transform: translateY(-50%);
     z-index: 55; display: flex; flex-direction: column; align-items: center;
     gap: 10px;
@@ -1190,7 +1197,7 @@
     box-shadow: 0 10px 30px rgba(70, 55, 90, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.45) inset;
     z-index: 10;
   }
-  nav.tabbar a {
+  nav.tabbar a:not([hidden]) {
     display: flex; flex-direction: column; align-items: center; gap: 3px;
     text-decoration: none; color: var(--ink-soft);
     font-size: 10.5px; font-weight: 700;
@@ -1418,7 +1425,7 @@
     /* .closing-card and .qr-card are left un-spanned on purpose, so they
        naturally land side by side as the one deliberate 2-up pairing. */
 
-    #details { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    #details:not([hidden]) { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
     #details .info-pills { grid-column: 1 / -1; flex-direction: row; }
     #details .info-pill { flex: 1; }
 
@@ -1559,7 +1566,7 @@
       </div>
     </div>
 
-    <div class="rsvp-card" style="margin-bottom: 26px;">
+    <div class="rsvp-card" id="rsvpCard" style="margin-bottom: 26px;">
       <div class="rsvp-admin-list" id="rsvpAdminList" hidden>
         <p class="rsvp-admin-total" id="rsvpTotal">0 guests attending</p>
         <div class="rsvp-admin-rows" id="rsvpRows"></div>
@@ -1649,7 +1656,7 @@
       </div>
     </div>
 
-    <div class="program-card">
+    <div class="program-card" id="programCard">
       <div class="sub-head">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <h2>Program</h2>
@@ -1687,6 +1694,7 @@
       <div class="video-embed" id="videoEmbed"></div>
     </div>
 
+    <div id="growthGalleryBlock">
     <div class="sub-head">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
       <h2>EMA Through the Months</h2>
@@ -1705,6 +1713,7 @@
 
     <div class="gallery-grid" id="galleryGrid"></div>
     <p class="gallery-note">Photos coming soon &mdash; send KD the birth-to-11-month set and each tile lights up.</p>
+    </div>
 
     <div class="admin-zone">
       <button type="button" class="admin-toggle" id="adminToggle">
@@ -1789,11 +1798,15 @@
           <button type="button" class="pillbtn p3" id="giftMethodAddBtn" style="margin-top: 8px; width: 100%;">Add Payment Method</button>
           <p class="admin-msg" id="giftMethodMsg"></p>
           <div class="img-editor-thumb-tray" id="giftMethodsAdminList"></div>
+          <label style="margin-top: 18px;">Show / Hide Sections</label>
+          <div id="visibilityToggleList"></div>
+          <button type="button" class="pillbtn p3" id="visibilitySaveBtn" style="margin-top: 8px; width: 100%;">Save Visibility</button>
+          <p class="admin-msg" id="visibilityMsg"></p>
         </div>
       </div>
     </div>
 
-    <div class="party-shots">
+    <div class="party-shots" id="partyShotsBlock">
       <div class="sub-head" style="margin-top: 30px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
         <h2>1 Year &mdash; Party Shots</h2>
@@ -2154,7 +2167,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M15 9h0M17.8 6.2 19 5M3 21l9-9M12.2 6.2 11 5"/></svg>
     Invite
   </a>
-  <a href="#details" data-target="details">
+  <a href="#details" data-target="details" id="navDetailsLink">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     Details
   </a>
@@ -2162,7 +2175,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
     Gallery
   </a>
-  <a href="#photobooth" data-target="photobooth">
+  <a href="#photobooth" data-target="photobooth" id="navPhotoboothLink">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
     Photobooth
   </a>
@@ -4553,7 +4566,31 @@ var qrcode = function() {
 
   // Declared up here (rather than further down near persistManifest/loadManifest)
   // because the avatar renderer below reads manifest.* at definition time.
-  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', bannerType: 'image', bannerVideos: [], avatarUrls: [], musicTracks: [], guestNames: [], giftMethods: [] };
+  /* Admin-toggleable cards/features. `elId` is hidden/shown directly; kind:
+     'tab' entries additionally hide their bottom-nav link via `navElId` --
+     unlike a discrete tab-switcher, this page is one continuous scroll, so
+     a "tab" only truly disappears for guests when its whole section is
+     hidden too (not just its nav shortcut). Gallery isn't offered as a
+     whole-tab toggle here because the Admin panel itself lives inside that
+     section -- hiding it would lock the site owner out of ever turning
+     anything back on. giftRegistry/wishes are folded into their own
+     existing content-driven hide logic inside applyVisibility() below
+     rather than being blindly hidden/shown here, since giftCard and
+     wishesCard already have their own visibility rules. */
+  var VISIBILITY_TOGGLES = [
+    { key: 'rsvp', label: 'RSVP (card)', elId: 'rsvpCard', kind: 'card' },
+    { key: 'program', label: 'Program Timeline (card)', elId: 'programCard', kind: 'card' },
+    { key: 'giftRegistry', label: 'Gift Registry (card)', elId: 'giftCard', kind: 'card' },
+    { key: 'growthGallery', label: 'Growth Gallery (within Gallery)', elId: 'growthGalleryBlock', kind: 'card' },
+    { key: 'partyShots', label: 'Party Shots (within Gallery)', elId: 'partyShotsBlock', kind: 'card' },
+    { key: 'musicPlayer', label: 'Background Music Player', elId: 'musicWidget', kind: 'card' },
+    { key: 'wishes', label: 'Wishes & Blessings Wall', elId: 'wishesCard', kind: 'card' },
+    { key: 'detailsTab', label: 'Details (tab)', elId: 'details', kind: 'tab', navElId: 'navDetailsLink' },
+    { key: 'photoboothTab', label: 'Photobooth (tab)', elId: 'photobooth', kind: 'tab', navElId: 'navPhotoboothLink' }
+  ];
+  var DEFAULT_HIDDEN_TOGGLES = [];
+
+  var manifest = { months: {}, monthPhotos: {}, photobooth: [], rsvps: [], wishes: [], celebrationLive: false, videoUrl: '', bannerUrl: '', bannerType: 'image', bannerVideos: [], avatarUrls: [], musicTracks: [], guestNames: [], giftMethods: [], hiddenToggles: [] };
 
   var TURNED_ONE_SWITCH = new Date('2026-10-08T00:00:00').getTime();
   function headlinePhrase(withBang) {
@@ -5621,7 +5658,8 @@ var qrcode = function() {
       guestNames: manifest.guestNames,
       avatarUrls: manifest.avatarUrls,
       musicTracks: manifest.musicTracks,
-      giftMethods: manifest.giftMethods
+      giftMethods: manifest.giftMethods,
+      hiddenToggles: manifest.hiddenToggles
     };
     return fetch('https://api.jsonbin.io/v3/b/' + GALLERY_CONFIG.jsonbinId, {
       method: 'PUT',
@@ -5629,6 +5667,53 @@ var qrcode = function() {
       body: JSON.stringify(record)
     });
   }
+
+  /* ---- Admin-controlled section visibility ---- */
+  function isToggleHidden(key) { return (manifest.hiddenToggles || []).indexOf(key) !== -1; }
+  function applyVisibility() {
+    VISIBILITY_TOGGLES.forEach(function (t) {
+      var el = document.getElementById(t.elId);
+      if (el) el.hidden = isToggleHidden(t.key);
+      if (t.navElId) {
+        var nav = document.getElementById(t.navElId);
+        if (nav) nav.hidden = isToggleHidden(t.key);
+      }
+    });
+    // giftCard and wishesCard each already have their own content-driven
+    // visibility rule (no gift methods added yet / celebration not live) --
+    // re-running those folds this toggle into that existing logic instead
+    // of the two systems fighting over the same element's hidden state.
+    if (typeof renderGiftCard === 'function') renderGiftCard();
+    if (typeof applyCelebrationState === 'function') applyCelebrationState();
+  }
+  function renderVisibilityChecklist() {
+    var wrap = document.getElementById('visibilityToggleList');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    VISIBILITY_TOGGLES.forEach(function (t) {
+      var row = document.createElement('label');
+      row.className = 'toggle-row';
+      var span = document.createElement('span');
+      span.textContent = t.label;
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.className = 'check-circle';
+      box.dataset.key = t.key;
+      box.checked = !isToggleHidden(t.key);
+      row.appendChild(span);
+      row.appendChild(box);
+      wrap.appendChild(row);
+    });
+  }
+  document.getElementById('visibilitySaveBtn').addEventListener('click', function () {
+    var msg = document.getElementById('visibilityMsg');
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('#visibilityToggleList .check-circle'));
+    manifest.hiddenToggles = boxes.filter(function (b) { return !b.checked; }).map(function (b) { return b.dataset.key; });
+    applyVisibility();
+    var p = isConfigured() ? persistManifest() : Promise.resolve();
+    p.then(function () { msg.textContent = 'Saved.'; msg.className = 'admin-msg ok'; })
+      .catch(function () { msg.textContent = 'Could not save — try again.'; msg.className = 'admin-msg err'; });
+  });
 
   function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, function (c) {
@@ -5760,10 +5845,11 @@ var qrcode = function() {
     if (typeof renderPlaylistUI === 'function') renderPlaylistUI();
     if (typeof renderBannerVideoList === 'function') renderBannerVideoList();
     if (typeof renderGiftMethodsAdminList === 'function') renderGiftMethodsAdminList();
+    renderVisibilityChecklist();
   }
 
   function loadManifest() {
-    if (!isConfigured()) { renderPhotoboothGrid(); renderWishThread(); applyCelebrationState(); return; }
+    if (!isConfigured()) { renderPhotoboothGrid(); renderWishThread(); applyCelebrationState(); applyVisibility(); return; }
     fetch('https://api.jsonbin.io/v3/b/' + GALLERY_CONFIG.jsonbinId + '/latest', {
       headers: { 'X-Master-Key': GALLERY_CONFIG.jsonbinKey }
     })
@@ -5799,6 +5885,7 @@ var qrcode = function() {
         manifest.musicTracks = (record && Array.isArray(record.musicTracks)) ? record.musicTracks : [];
         manifest.guestNames = (record && Array.isArray(record.guestNames)) ? record.guestNames : [];
         manifest.giftMethods = (record && Array.isArray(record.giftMethods)) ? record.giftMethods : [];
+        manifest.hiddenToggles = (record && Array.isArray(record.hiddenToggles)) ? record.hiddenToggles : DEFAULT_HIDDEN_TOGGLES.slice();
         renderGuestNameDatalist();
         applyBannerUrl();
         renderAvatar();
@@ -5808,10 +5895,11 @@ var qrcode = function() {
         renderWishThread();
         renderVideoCard(manifest.videoUrl);
         applyCelebrationState();
+        applyVisibility();
         if (sessionStorage.getItem('emaGalleryAdmin') === '1') { revealAdminExtras(); }
         flushQueue();
       })
-      .catch(function () { renderPhotoboothGrid(); renderWishThread(); applyCelebrationState(); });
+      .catch(function () { renderPhotoboothGrid(); renderWishThread(); applyCelebrationState(); applyVisibility(); });
   }
   // Called at the very end of this script, once every DOM reference below is set up.
 
@@ -6280,6 +6368,9 @@ var qrcode = function() {
   var collageShots = [];
   var COLLAGE_SHOT_COUNT = 4;
   var COLLAGE_SHOT_LABELS = ['Primary shot', 'Secondary shot 1', 'Secondary shot 2', 'Secondary shot 3'];
+  // Each tile crops to the 4R print's own ratio (4x6in, 3:2 landscape)
+  // instead of 16:9, so every shot matches the shape of the finished card.
+  var COLLAGE_TILE_RATIO = 3 / 2;
   var activeStickers = [];
   var previewStickers = [];
 
@@ -7846,6 +7937,17 @@ var qrcode = function() {
       'rotate(' + state.rot + 'deg) scale(' + state.scale + ')';
   }
 
+  // wrap's own rendered (screen) size, divided by its unscaled layout size --
+  // 1 normally, >1 once the collage editing window has been pinch-zoomed
+  // (see the wrap-level zoom/pan below). Sticker positions are always kept
+  // in wrap's *local* (unscaled) space, since that's the space their own
+  // CSS transform is nested inside of -- so every screen-pixel delta from a
+  // pointer event has to be divided by this factor before it's stored.
+  function wrapZoomFactor(wrap) {
+    var rect = wrap.getBoundingClientRect();
+    return wrap.clientWidth ? (rect.width / wrap.clientWidth) : 1;
+  }
+
   function makeStickerInteractive(wrapper, state, wrap) {
     var pointers = new Map();
     var dragOffX = 0, dragOffY = 0;
@@ -7856,9 +7958,10 @@ var qrcode = function() {
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       bringToFront(wrapper);
       var rect = wrap.getBoundingClientRect();
+      var z = wrapZoomFactor(wrap);
       if (pointers.size === 1) {
-        dragOffX = (e.clientX - rect.left) - state.x;
-        dragOffY = (e.clientY - rect.top) - state.y;
+        dragOffX = ((e.clientX - rect.left) / z) - state.x;
+        dragOffY = ((e.clientY - rect.top) / z) - state.y;
       } else if (pointers.size === 2) {
         var pts = Array.from(pointers.values());
         startDist = pDist(pts[0], pts[1]);
@@ -7872,10 +7975,11 @@ var qrcode = function() {
       if (!pointers.has(e.pointerId)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       var rect = wrap.getBoundingClientRect();
+      var z = wrapZoomFactor(wrap);
 
       if (pointers.size === 1) {
-        state.x = (e.clientX - rect.left) - dragOffX;
-        state.y = (e.clientY - rect.top) - dragOffY;
+        state.x = ((e.clientX - rect.left) / z) - dragOffX;
+        state.y = ((e.clientY - rect.top) / z) - dragOffY;
       } else if (pointers.size >= 2) {
         var pts = Array.from(pointers.values()).slice(0, 2);
         var d = pDist(pts[0], pts[1]);
@@ -7891,8 +7995,9 @@ var qrcode = function() {
       if (pointers.size === 1) {
         var remaining = Array.from(pointers.values())[0];
         var rect = wrap.getBoundingClientRect();
-        dragOffX = (remaining.x - rect.left) - state.x;
-        dragOffY = (remaining.y - rect.top) - state.y;
+        var z = wrapZoomFactor(wrap);
+        dragOffX = ((remaining.x - rect.left) / z) - state.x;
+        dragOffY = ((remaining.y - rect.top) / z) - state.y;
       }
     }
     wrapper.addEventListener('pointerup', endPointer);
@@ -7900,7 +8005,6 @@ var qrcode = function() {
   }
 
   function addSticker(item, wrap, stickersArr) {
-    var rect = wrap.getBoundingClientRect();
     var wrapper = document.createElement('div');
     wrapper.className = 'sticker-wrap';
 
@@ -7925,8 +8029,8 @@ var qrcode = function() {
     wrapper.appendChild(img);
     wrapper.appendChild(del);
 
-    var baseWidth = rect.width * 0.55;
-    var state = { x: rect.width / 2, y: rect.height / 2, scale: 1, rot: 0, w: item.w, h: item.h, baseWidth: baseWidth };
+    var baseWidth = wrap.clientWidth * 0.55;
+    var state = { x: wrap.clientWidth / 2, y: wrap.clientHeight / 2, scale: 1, rot: 0, w: item.w, h: item.h, baseWidth: baseWidth };
     wrapper.style.width = baseWidth + 'px';
     wrapper.style.height = (baseWidth * item.h / item.w) + 'px';
 
@@ -7946,10 +8050,11 @@ var qrcode = function() {
   function clearPreviewStickers() { clearStickerSet(previewStickers); }
 
   // Composites placed stickers (from their live DOM position/scale/rotation)
-  // onto a canvas of size w x h, scaling from wrap's rendered CSS size.
+  // onto a canvas of size w x h, scaling from wrap's unscaled layout size --
+  // sticker state.x/y/baseWidth are always in that local space (see
+  // wrapZoomFactor), not wrap's current possibly-zoomed rendered size.
   function drawStickersToCanvas(ctx, wrap, stickersArr, w, h) {
-    var wrapRect = wrap.getBoundingClientRect();
-    var factor = w / wrapRect.width;
+    var factor = w / wrap.clientWidth;
     stickersArr.forEach(function (s) {
       var st = s.state;
       var cx = st.x * factor;
@@ -8128,6 +8233,64 @@ var qrcode = function() {
     clearStickers();
     refreshFrameOverlay();
   }
+  /* ---- Pinch-to-zoom / drag-to-pan for the collage edit window itself
+     (the whole photo+frame+stickers view, not any one sticker) -- lets a
+     zoomed-in look line up per-tile frames or the Ema sticker precisely.
+     Mirrors the gallery lightbox's own pinch/pan pattern (translate+scale,
+     clamped 1x-4x, pan only once zoomed in). A gesture that starts on a
+     sticker is left alone here (that's the sticker's own drag/pinch, via
+     makeStickerInteractive) so the two systems never fight over one touch. */
+  var collageViewScale = 1, collageViewX = 0, collageViewY = 0;
+  function applyCollageViewTransform() {
+    camPreviewWrap.style.transform = (collageViewScale === 1 && !collageViewX && !collageViewY)
+      ? '' : 'translate(' + collageViewX + 'px, ' + collageViewY + 'px) scale(' + collageViewScale + ')';
+  }
+  function resetCollageViewTransform() {
+    collageViewScale = 1; collageViewX = 0; collageViewY = 0;
+    camPreviewWrap.style.transform = '';
+  }
+  (function () {
+    var pointers = new Map();
+    var dragging = false, dragStartX = 0, dragStartY = 0, dragOrigX = 0, dragOrigY = 0;
+    var startDist = 0, startScale = 1;
+
+    camPreviewWrap.addEventListener('pointerdown', function (e) {
+      if (lastCaptureType !== 'collage') return;
+      if (e.target.closest && e.target.closest('.sticker-wrap')) return;
+      camPreviewWrap.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) {
+        dragging = true;
+        dragStartX = e.clientX; dragStartY = e.clientY;
+        dragOrigX = collageViewX; dragOrigY = collageViewY;
+      } else if (pointers.size === 2) {
+        var pts = Array.from(pointers.values());
+        startDist = pDist(pts[0], pts[1]);
+        startScale = collageViewScale;
+      }
+    });
+    camPreviewWrap.addEventListener('pointermove', function (e) {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        var pts = Array.from(pointers.values());
+        var d = pDist(pts[0], pts[1]);
+        collageViewScale = clampNum(startScale * (d / (startDist || d)), 1, 4);
+        applyCollageViewTransform();
+      } else if (pointers.size === 1 && dragging && collageViewScale > 1) {
+        collageViewX = dragOrigX + (e.clientX - dragStartX);
+        collageViewY = dragOrigY + (e.clientY - dragStartY);
+        applyCollageViewTransform();
+      }
+    });
+    function endPointer(e) {
+      pointers.delete(e.pointerId);
+      dragging = pointers.size > 0;
+    }
+    camPreviewWrap.addEventListener('pointerup', endPointer);
+    camPreviewWrap.addEventListener('pointercancel', endPointer);
+  })();
+
   // A 4-in-1 collage is landscape-shaped (1800x1200); reviewing/editing it
   // is only offered as a proper landscape view when the phone is actually
   // tilted sideways -- not squeezed/cropped into a portrait-shaped box on
@@ -8138,6 +8301,8 @@ var qrcode = function() {
   function updateCollagePreviewOrientation() {
     var isCollage = lastCaptureType === 'collage';
     var landscape = camOrientation === 'landscape';
+    var prevLandscape = camPreviewWrap.classList.contains('collage-landscape');
+    if (isCollage && landscape !== prevLandscape) resetCollageViewTransform();
     camPreviewWrap.setAttribute('data-orientation', camOrientation);
     camPreviewWrap.classList.toggle('collage-landscape', isCollage && landscape);
     camPreviewWrap.classList.toggle('collage-portrait', isCollage && !landscape);
@@ -8240,6 +8405,7 @@ var qrcode = function() {
     collageShots = [];
     collageTileFrameStyle = ['sparkles', 'sparkles', 'sparkles', 'sparkles'];
     updateCollageProgressUI();
+    resetCollageViewTransform();
   }
 
   function captureCollageShot() {
@@ -8306,14 +8472,14 @@ var qrcode = function() {
   // {x,y,w,h} so its selected decorative frame can be overlaid at the
   // exact same rect afterward.
   function fitCollageTileRect(boxX, boxY, boxW, boxH) {
-    var targetRatio = 16 / 9;
+    var targetRatio = COLLAGE_TILE_RATIO;
     var w, h;
     if (boxW / boxH > targetRatio) { h = boxH; w = h * targetRatio; }
     else { w = boxW; h = w / targetRatio; }
     return { x: boxX + (boxW - w) / 2, y: boxY + (boxH - h) / 2, w: w, h: h };
   }
   function drawCollagePhoto(ctx, shotCanvas, rect) {
-    var targetRatio = 16 / 9;
+    var targetRatio = COLLAGE_TILE_RATIO;
     var sw = shotCanvas.width, sh = shotCanvas.height;
     var srcRatio = sw / sh;
     var cropW, cropH, cropX, cropY;
@@ -8401,7 +8567,7 @@ var qrcode = function() {
     // top afterward (see addCollageEmaSticker()), not baked in here, so
     // it's still editable after this first render.
     var circleAreaY = y + headlineH, circleAreaH = h - headlineH - subH;
-    var diameter = Math.min(w * 0.5, circleAreaH * 0.86);
+    var diameter = Math.min(w * 0.72, circleAreaH * 0.94);
     var ccx = x + w / 2, ccy = circleAreaY + circleAreaH / 2;
     ctx.save();
     ctx.beginPath();
@@ -8487,11 +8653,23 @@ var qrcode = function() {
     var emaItem = STICKER_LIBRARY.filter(function (s) { return s.id === 'ema'; })[0] || STICKER_LIBRARY[0];
     addSticker(emaItem, camPreviewWrap, previewStickers);
     var entry = previewStickers[previewStickers.length - 1];
-    var wrapRect = camPreviewWrap.getBoundingClientRect();
-    var factor = wrapRect.width / camCanvas.width;
-    entry.state.x = collageCircleGeom.cx * factor;
-    entry.state.y = collageCircleGeom.cy * factor;
-    entry.state.scale = (collageCircleGeom.diameter * factor * 0.82) / entry.state.baseWidth;
+    // Map the circle guide's canvas-pixel position into the wrap's own
+    // local (unscaled) CSS space, accounting for the object-fit:contain
+    // letterbox bars around the rendered image whenever the wrap's own
+    // aspect isn't exactly the collage's 3:2 -- the near-universal case
+    // once the edit view goes full screen on a real device.
+    var boxW = camPreviewWrap.clientWidth, boxH = camPreviewWrap.clientHeight;
+    var imgRatio = camCanvas.width / camCanvas.height;
+    var renderW, renderH;
+    if (boxW / boxH > imgRatio) { renderH = boxH; renderW = renderH * imgRatio; }
+    else { renderW = boxW; renderH = renderW / imgRatio; }
+    var offsetX = (boxW - renderW) / 2, offsetY = (boxH - renderH) / 2;
+    var factor = renderW / camCanvas.width;
+    entry.state.x = offsetX + collageCircleGeom.cx * factor;
+    entry.state.y = offsetY + collageCircleGeom.cy * factor;
+    // Starts noticeably bigger than the circle guide (not fitted exactly
+    // to it), so there's obvious room to drag/pinch it down to size.
+    entry.state.scale = (collageCircleGeom.diameter * factor * 1.25) / entry.state.baseWidth;
     applyStickerTransform(entry.wrapper, entry.state);
   }
 
