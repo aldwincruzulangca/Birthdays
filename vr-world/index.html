@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Virtual World</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0b18; font-family: system-ui, sans-serif; }
+  canvas { display: block; touch-action: none; }
+  #hud {
+    position: fixed; top: 12px; left: 12px; max-width: min(320px, calc(100vw - 24px));
+    padding: 10px 14px; border-radius: 12px; color: #fff; font-size: 13px; line-height: 1.5;
+    background: rgba(10, 10, 30, .55); backdrop-filter: blur(6px); z-index: 5;
+  }
+  #hud b { display: block; font-size: 15px; margin-bottom: 2px; }
+  #hud button {
+    margin-top: 6px; margin-right: 6px; padding: 6px 10px; border: 0; border-radius: 8px;
+    font: inherit; color: #fff; background: rgba(255, 255, 255, .18); cursor: pointer;
+  }
+  #hud [hidden] { display: none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="hud">
+  <b>Virtual World</b>
+  <span id="hint">Drag to look around 360° · W A S D / arrows to walk · Shift to run. Find the mirror wall and the mirror pond.</span>
+  <div>
+    <button id="gyro" hidden>Use phone motion to look</button>
+    <button id="close">Hide</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { VRButton } from './lib/VRButton.js';
+import { Reflector } from './lib/Reflector.js';
+
+/* ---------------------------------------------------------------- renderer */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local-floor');
+document.body.appendChild(renderer.domElement);
+document.body.appendChild(VRButton.createButton(renderer));
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0xe08a68, 0.014);
+
+const EYE = 1.65;
+const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.05, 600);
+camera.rotation.order = 'YXZ';
+camera.position.y = EYE;
+const player = new THREE.Group();   // moved around by walking / thumbsticks
+player.position.set(0, 0, 3);
+player.add(camera);
+scene.add(player);
+
+/* ------------------------------------------------------------------- world */
+// 360° sky with sunset, sun and stars — it follows the head so it never parallaxes.
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(300, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `
+      varying vec3 vD;
+      float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+      void main(){
+        float y = vD.y;
+        vec3 top = vec3(0.05, 0.06, 0.22), mid = vec3(0.45, 0.25, 0.5), hor = vec3(1.0, 0.55, 0.4);
+        vec3 c = y > 0.0 ? mix(hor, mix(mid, top, smoothstep(0.15, 0.7, y)), smoothstep(0.0, 0.25, y)) : hor * 0.5;
+        c += vec3(1.0) * step(0.997, hash(floor(vD * 150.0))) * smoothstep(0.15, 0.5, y);
+        float sd = max(dot(vD, normalize(vec3(0.4, 0.1, 0.9))), 0.0);
+        c += vec3(1.0, 0.8, 0.5) * (pow(sd, 400.0) * 3.0 + pow(sd, 12.0) * 0.35);
+        gl_FragColor = vec4(c, 1.0);
+      }`
+  })
+);
+scene.add(sky);
+
+// Ground with a soft grid so movement is easy to feel.
+const gc = document.createElement('canvas'); gc.width = gc.height = 256;
+const gx = gc.getContext('2d');
+gx.fillStyle = '#4a4560'; gx.fillRect(0, 0, 256, 256);
+gx.fillStyle = '#58527a'; gx.fillRect(0, 0, 128, 128); gx.fillRect(128, 128, 128, 128);
+const gtex = new THREE.CanvasTexture(gc);
+gtex.colorSpace = THREE.SRGBColorSpace;
+gtex.wrapS = gtex.wrapT = THREE.RepeatWrapping;
+gtex.repeat.set(60, 60);
+gtex.anisotropy = 8;
+const ground = new THREE.Mesh(new THREE.CircleGeometry(120, 64), new THREE.MeshStandardMaterial({ map: gtex, roughness: 0.85 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+scene.add(new THREE.HemisphereLight(0xffd9c0, 0x403050, 1.3));
+const sun = new THREE.DirectionalLight(0xffc9a0, 1.6); sun.position.set(4, 3, 9); scene.add(sun);
+const fill = new THREE.DirectionalLight(0xbcd0ff, 1.4); fill.position.set(-3, 5, -8); scene.add(fill);
+
+// The big mirror wall.
+const MIRROR_Z = -6;
+const mirror = new Reflector(new THREE.PlaneGeometry(10, 4.2), { textureWidth: 1536, textureHeight: 644, color: 0xc4c8d0, clipBias: 0.003 });
+mirror.position.set(0, 2.1, MIRROR_Z);
+scene.add(mirror);
+const frameMat = new THREE.MeshStandardMaterial({ color: 0xd8b25a, metalness: 0.7, roughness: 0.35 });
+for (const [w, h, x, y] of [[10.4, 0.2, 0, 4.3], [10.4, 0.2, 0, 0.0], [0.2, 4.4, -5.1, 2.1], [0.2, 4.4, 5.1, 2.1]]) {
+  const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.15), frameMat);
+  f.position.set(x, y, MIRROR_Z - 0.02);
+  scene.add(f);
+}
+
+// A mirror pond on the floor — look down into it.
+const pond = new Reflector(new THREE.CircleGeometry(1.6, 64), { textureWidth: 1024, textureHeight: 1024, color: 0xa7bccd, clipBias: 0.003 });
+pond.rotation.x = -Math.PI / 2;
+pond.position.set(-3.4, 0.02, -1.2);
+scene.add(pond);
+const rim = new THREE.Mesh(new THREE.TorusGeometry(1.66, 0.07, 10, 64), frameMat);
+rim.rotation.x = Math.PI / 2; rim.position.set(-3.4, 0.05, -1.2);
+scene.add(rim);
+
+// Pillars all around so a full 360° turn always has something to see.
+const pillarGeo = new THREE.CylinderGeometry(0.35, 0.45, 5, 20);
+const pillarMat = new THREE.MeshStandardMaterial({ color: 0xcfc6e8, roughness: 0.5 });
+const glowCols = [0xff5d8f, 0xffb84d, 0x6be4a0, 0x5db7ff, 0xb48cff];
+const gems = [];
+for (let i = 0; i < 10; i++) {
+  const a = (i / 10) * Math.PI * 2 + 0.3, r = 15;
+  const p = new THREE.Mesh(pillarGeo, pillarMat);
+  p.position.set(Math.sin(a) * r, 2.5, Math.cos(a) * r);
+  scene.add(p);
+  const col = glowCols[i % glowCols.length];
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.9, roughness: 0.2 }));
+  gem.position.set(p.position.x, 6, p.position.z);
+  scene.add(gem); gems.push(gem);
+}
+
+// Balloons.
+const balloons = [];
+for (let i = 0; i < 16; i++) {
+  const a = (i / 16) * Math.PI * 2 + 0.2, r = 7 + (i % 3) * 3.2;
+  const col = glowCols[i % glowCols.length];
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 16), new THREE.MeshStandardMaterial({ color: col, roughness: 0.25, metalness: 0.1 }));
+  b.scale.y = 1.2;
+  b.userData = { x: Math.sin(a) * r, z: Math.cos(a) * r, y: 2.2 + (i % 4) * 0.5, t: i * 0.7 };
+  b.position.set(b.userData.x, b.userData.y, b.userData.z);
+  const s = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, b.userData.y, 4), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  s.position.set(b.userData.x, b.userData.y / 2 - 0.5, b.userData.z);
+  scene.add(b, s); balloons.push(b);
+}
+
+// A pedestal with a spinning knot, off to the right.
+const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.75, 0.9, 24), pillarMat);
+ped.position.set(4, 0.45, -2);
+const knot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.4, 0.12, 120, 16), new THREE.MeshStandardMaterial({ color: 0xffd36b, metalness: 0.9, roughness: 0.18 }));
+knot.position.set(4, 1.7, -2);
+scene.add(ped, knot);
+const glow1 = new THREE.PointLight(0xff7ab0, 12, 12); glow1.position.set(4, 2.4, -1);
+const glow2 = new THREE.PointLight(0x7ab8ff, 12, 12); glow2.position.set(-3.4, 1.6, -1.2);
+scene.add(glow1, glow2);
+
+/* ------------------------------------------------------------ player avatar */
+// A full body built in world space (not parented to the camera) so it shows
+// up in every reflection: hands, arms, legs, feet, and — in mirrors only — the head and torso.
+const UP = new THREE.Vector3(0, 1, 0), RIGHT = new THREE.Vector3(1, 0, 0);
+const skinM = new THREE.MeshStandardMaterial({ color: 0xe3ad8c, roughness: 0.65 });
+const shirtM = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 });
+const pantsM = new THREE.MeshStandardMaterial({ color: 0x2c3556, roughness: 0.8 });
+const shoeM = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.5 });
+const hairM = new THREE.MeshStandardMaterial({ color: 0x2a1b12, roughness: 0.9 });
+const darkM = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.4 });
+const unitCyl = new THREE.CylinderGeometry(1, 1, 1, 14);
+const unitBall = new THREE.SphereGeometry(1, 14, 10);
+
+const mkLimb = m => { const o = new THREE.Mesh(unitCyl, m); scene.add(o); return o; };
+const mkJoint = (m, r) => { const o = new THREE.Mesh(unitBall, m); o.scale.setScalar(r); scene.add(o); return o; };
+const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
+
+function setLimb(mesh, a, b, rx, rz, yawQ) {
+  const len = Math.max(a.distanceTo(b), 1e-4);
+  tmp.subVectors(b, a).divideScalar(len);
+  mesh.position.addVectors(a, b).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(UP, tmp);
+  if (yawQ) mesh.quaternion.premultiply(yawQ);
+  mesh.scale.set(rx, len, rz);
+}
+
+// Two-bone IK: places the middle joint (knee / elbow) between a and b, bending toward `pole`.
+const axis = new THREE.Vector3(), perp = new THREE.Vector3();
+function ik(a, b, l1, l2, pole, out) {
+  const d = Math.max(a.distanceTo(b), 1e-3), dd = Math.min(d, l1 + l2 - 1e-3);
+  axis.subVectors(b, a).divideScalar(d);
+  const x = (l1 * l1 - l2 * l2 + dd * dd) / (2 * dd);
+  const h = Math.sqrt(Math.max(0, l1 * l1 - x * x));
+  perp.copy(pole).addScaledVector(axis, -pole.dot(axis));
+  if (perp.lengthSq() < 1e-6) perp.set(0, 0, 1);
+  perp.normalize();
+  out.copy(a).addScaledVector(axis, x).addScaledVector(perp, h);
+}
+
+function makeHand(side) { // side: -1 left, +1 right. Built palm-down with fingers along -Z.
+  const g = new THREE.Group();
+  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.026, 0.09), skinM);
+  palm.position.z = -0.045; g.add(palm);
+  const lens = [0.05, 0.058, 0.054, 0.042];
+  lens.forEach((l, i) => {
+    const f = new THREE.Mesh(new THREE.CapsuleGeometry(0.0095, l, 4, 8), skinM);
+    f.rotation.x = Math.PI / 2;
+    f.position.set(-0.031 + i * 0.0205, 0, -0.09 - l / 2 - 0.005);
+    g.add(f);
+  });
+  const th = new THREE.Mesh(new THREE.CapsuleGeometry(0.011, 0.04, 4, 8), skinM);
+  th.rotation.set(Math.PI / 2, 0, side * 0.7);
+  th.position.set(-side * 0.055, 0, -0.04);
+  g.add(th);
+  // palm-inward, thumb-up "holding" pose
+  const root = new THREE.Group();
+  g.rotation.z = -side * Math.PI / 2;
+  root.add(g);
+  scene.add(root);
+  return root;
+}
+
+const hands = { left: makeHand(-1), right: makeHand(1) };
+
+// parts that must only show in reflections (they'd block the camera otherwise)
+const mirrorOnly = [];
+const hipJ = { left: null, right: null };
+const head = new THREE.Group();
+const skull = new THREE.Mesh(unitBall, skinM); skull.scale.set(0.095, 0.115, 0.105); skull.position.set(0, 0.03, 0.085);
+const hair = new THREE.Mesh(new THREE.SphereGeometry(0.113, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), hairM); hair.position.set(0, 0.045, 0.092);
+const eyeGeo = new THREE.SphereGeometry(0.014, 8, 6);
+for (const s of [-1, 1]) {
+  const e = new THREE.Mesh(eyeGeo, darkM); e.position.set(s * 0.036, 0.0, -0.014); head.add(e);
+}
+head.add(skull, hair);
+scene.add(head);
+const torso = mkLimb(shirtM), neck = mkLimb(skinM);
+mirrorOnly.push(head, torso, neck);
+mirrorOnly.forEach(o => (o.visible = false));
+const setMirrorBody = v => mirrorOnly.forEach(o => (o.visible = v));
+
+const upperArm = { left: mkLimb(shirtM), right: mkLimb(shirtM) };
+const foreArm = { left: mkLimb(skinM), right: mkLimb(skinM) };
+const shoulder = { left: mkJoint(shirtM, 0.065), right: mkJoint(shirtM, 0.065) };
+const elbow = { left: mkJoint(skinM, 0.045), right: mkJoint(skinM, 0.045) };
+const thigh = { left: mkLimb(pantsM), right: mkLimb(pantsM) };
+const shin = { left: mkLimb(pantsM), right: mkLimb(pantsM) };
+const knee = { left: mkJoint(pantsM, 0.068), right: mkJoint(pantsM, 0.068) };
+mirrorOnly.push(shoulder.left, shoulder.right, upperArm.left, upperArm.right);
+mirrorOnly.forEach(o => (o.visible = false));
+hipJ.left = mkJoint(pantsM, 0.078); hipJ.right = mkJoint(pantsM, 0.078);
+const shoe = { left: new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.27), shoeM), right: new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.27), shoeM) };
+scene.add(shoe.left, shoe.right);
+
+// Mirrors render the scene from their own viewpoint: reveal head + torso for that pass only,
+// and hide the other mirror so the reflections don't recurse.
+const mirrors = [mirror, pond];
+for (const m of mirrors) {
+  const orig = m.onBeforeRender;
+  m.onBeforeRender = function (...args) {
+    setMirrorBody(true);
+    mirrors.forEach(o => { if (o !== m) o.visible = false; });
+    orig.apply(m, args);
+    mirrors.forEach(o => (o.visible = true));
+    setMirrorBody(false);
+  };
+}
+
+/* ------------------------------------------------------------------ input */
+const keys = {};
+addEventListener('keydown', e => { keys[e.code] = true; });
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+let yaw = 0, pitch = 0;
+const stick = { x: 0, y: 0 };
+const pointers = new Map();
+const el = renderer.domElement;
+el.addEventListener('pointerdown', e => {
+  el.setPointerCapture(e.pointerId);
+  const role = e.pointerType === 'touch' && e.clientX < innerWidth / 2 ? 'move' : 'look';
+  pointers.set(e.pointerId, { role, sx: e.clientX, sy: e.clientY, lx: e.clientX, ly: e.clientY });
+});
+el.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  if (p.role === 'look') {
+    yaw -= (e.clientX - p.lx) * 0.005;
+    pitch = Math.max(-1.5, Math.min(1.5, pitch - (e.clientY - p.ly) * 0.005));
+  } else {
+    stick.x = Math.max(-1, Math.min(1, (e.clientX - p.sx) / 60));
+    stick.y = Math.max(-1, Math.min(1, (e.clientY - p.sy) / 60));
+  }
+  p.lx = e.clientX; p.ly = e.clientY;
+});
+const endPointer = e => {
+  const p = pointers.get(e.pointerId);
+  if (p && p.role === 'move') stick.x = stick.y = 0;
+  pointers.delete(e.pointerId);
+};
+el.addEventListener('pointerup', endPointer);
+el.addEventListener('pointercancel', endPointer);
+
+// Phone gyroscope: turn your body and the world follows (works in any mobile browser).
+let gyro = null;
+const gyroBtn = document.getElementById('gyro');
+if ('ontouchstart' in window && typeof DeviceOrientationEvent !== 'undefined') gyroBtn.hidden = false;
+gyroBtn.addEventListener('click', async () => {
+  try {
+    if (DeviceOrientationEvent.requestPermission && (await DeviceOrientationEvent.requestPermission()) !== 'granted') return;
+  } catch (_) { return; }
+  addEventListener('deviceorientation', e => { if (e.alpha != null) gyro = { a: e.alpha, b: e.beta, g: e.gamma }; });
+  gyroBtn.hidden = true;
+  document.getElementById('hint').textContent = 'Move your phone to look around 360°. Touch and drag the left half to walk, the right half to turn.';
+});
+const gEuler = new THREE.Euler(), gQ = new THREE.Quaternion(), gQ1 = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2), zAxis = new THREE.Vector3(0, 0, 1);
+const rad = THREE.MathUtils.degToRad;
+function gyroQuat(out) {
+  const o = rad((screen.orientation && screen.orientation.angle) || 0);
+  gEuler.set(rad(gyro.b), rad(gyro.a), -rad(gyro.g), 'YXZ');
+  out.setFromEuler(gEuler).multiply(gQ1).multiply(gQ.setFromAxisAngle(zAxis, -o));
+}
+
+document.getElementById('close').addEventListener('click', () => { document.getElementById('hud').style.display = 'none'; });
+
+/* ----------------------------------------------------------- VR sessions */
+const grips = [0, 1].map(i => {
+  const g = renderer.xr.getControllerGrip(i);
+  g.userData = { active: false };
+  g.addEventListener('connected', e => { g.userData = { active: true, hand: e.data.handedness, pad: e.data.gamepad }; });
+  g.addEventListener('disconnected', () => { g.userData.active = false; });
+  player.add(g);
+  return g;
+});
+let inXR = false, snapReady = true;
+renderer.xr.addEventListener('sessionstart', () => { inXR = true; document.getElementById('hud').style.display = 'none'; });
+renderer.xr.addEventListener('sessionend', () => {
+  inXR = false;
+  player.rotation.set(0, 0, 0);
+  camera.position.set(0, EYE, 0);
+});
+
+/* ------------------------------------------------------------------ frame */
+const headPos = new THREE.Vector3(), prevHead = new THREE.Vector3(), headQ = new THREE.Quaternion(), dir = new THREE.Vector3();
+const v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
+let headYaw = 0, bodyYaw = 0, speed = 0, phase = 0, firstFrame = true;
+const WORLD_R = 45;
+
+function snapTurn(ang) {
+  camera.getWorldPosition(v1);
+  player.rotation.y += ang;
+  player.updateMatrixWorld(true);
+  camera.getWorldPosition(v2);
+  player.position.x += v1.x - v2.x;
+  player.position.z += v1.z - v2.z;
+}
+
+function locomotion(dt) {
+  let mx = 0, my = 0, run = 1;
+  if (inXR) {
+    for (const g of grips) {
+      const u = g.userData;
+      if (!u.active || !u.pad) continue;
+      const ax = u.pad.axes, x = ax[2] || 0, y = ax[3] || 0;
+      if (u.hand === 'left') { mx += Math.abs(x) > 0.15 ? x : 0; my += Math.abs(y) > 0.15 ? y : 0; }
+      else if (u.hand === 'right') {
+        if (Math.abs(x) > 0.7 && snapReady) { snapTurn(-Math.sign(x) * Math.PI / 6); snapReady = false; }
+        else if (Math.abs(x) < 0.3) snapReady = true;
+      }
+    }
+  } else {
+    mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + stick.x;
+    my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + stick.y;
+    run = keys.ShiftLeft || keys.ShiftRight ? 2 : 1;
+  }
+  const len = Math.hypot(mx, my);
+  if (len > 1) { mx /= len; my /= len; }
+  const s = 2.6 * run * dt;
+  // forward is the direction you are looking, right is 90° to it
+  player.position.x += (-Math.sin(headYaw) * -my + Math.cos(headYaw) * mx) * s;
+  player.position.z += (-Math.cos(headYaw) * -my - Math.sin(headYaw) * mx) * s;
+}
+
+function constrain() {
+  camera.getWorldPosition(v1);
+  let x = v1.x, z = v1.z;
+  const r = Math.hypot(x, z);
+  if (r > WORLD_R) { x *= WORLD_R / r; z *= WORLD_R / r; }
+  if (Math.abs(x) < 5.4 && z < MIRROR_Z + 0.6 && z > MIRROR_Z - 0.6) z = MIRROR_Z + 0.6;
+  player.position.x += x - v1.x;
+  player.position.z += z - v1.z;
+}
+
+const yawQ = new THREE.Quaternion();
+const fwd = new THREE.Vector3(), right = new THREE.Vector3();
+const hip = new THREE.Vector3(), foot = new THREE.Vector3(), ankle = new THREE.Vector3(), kneeP = new THREE.Vector3(), pole = new THREE.Vector3();
+const shoulderP = new THREE.Vector3(), wrist = new THREE.Vector3(), elbowP = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3();
+
+function updateAvatar(dt, t) {
+  camera.getWorldPosition(headPos);
+  camera.getWorldQuaternion(headQ);
+
+  if (!firstFrame && dt > 0) {
+    const v = Math.hypot(headPos.x - prevHead.x, headPos.z - prevHead.z) / dt;
+    speed += (Math.min(v, 6) - speed) * Math.min(1, dt * 8);
+  }
+  prevHead.copy(headPos);
+  firstFrame = false;
+
+  let d = Math.atan2(Math.sin(headYaw - bodyYaw), Math.cos(headYaw - bodyYaw));
+  bodyYaw += d * Math.min(1, dt * 5);
+  yawQ.setFromAxisAngle(UP, bodyYaw);
+  fwd.set(-Math.sin(bodyYaw), 0, -Math.cos(bodyYaw));
+  right.set(Math.cos(bodyYaw), 0, -Math.sin(bodyYaw));
+
+  const moving = speed > 0.12;
+  phase += speed * dt * 3.2;
+  const amp = moving ? Math.min(speed, 3.5) * 0.085 : 0;
+  const h = headPos.y;
+  const cx = headPos.x, cz = headPos.z;
+
+  // head, neck, torso (mirror-only)
+  head.position.copy(headPos); head.quaternion.copy(headQ);
+  const hipY = Math.max(0.45, Math.min(h * 0.53, h - 0.5));
+  const shY = h - 0.25;
+  a.set(cx, h - 0.07, cz); b.set(cx, shY, cz); setLimb(neck, a, b, 0.045, 0.045);
+  a.set(cx, hipY, cz); b.set(cx, shY, cz); setLimb(torso, a, b, 0.17, 0.1, yawQ);
+
+  // legs + feet, with a walk cycle driven by how fast the head is travelling
+  for (const [name, s] of [['left', -1], ['right', 1]]) {
+    const ph = phase + (s < 0 ? 0 : Math.PI), sw = Math.sin(ph) * amp;
+    hip.set(cx, hipY, cz).addScaledVector(right, s * 0.09);
+    foot.set(cx, 0.04, cz).addScaledVector(right, s * 0.1).addScaledVector(fwd, sw);
+    foot.y += moving ? Math.max(0, Math.cos(ph)) * 0.09 : 0;
+    shoe[name].position.copy(foot).addScaledVector(fwd, 0.05);
+    shoe[name].quaternion.copy(yawQ);
+    ankle.copy(foot); ankle.y += 0.07;
+    pole.copy(fwd).addScaledVector(right, s * 0.15);
+    ik(hip, ankle, 0.46, 0.45, pole, kneeP);
+    setLimb(thigh[name], hip, kneeP, 0.075, 0.075);
+    setLimb(shin[name], kneeP, ankle, 0.055, 0.055);
+    knee[name].position.copy(kneeP);
+    hipJ[name].position.copy(hip);
+  }
+
+  // arms + hands
+  for (const [name, s] of [['left', -1], ['right', 1]]) {
+    const hand = hands[name];
+    const grip = inXR ? grips.find(g => g.userData.active && g.userData.hand === name) : null;
+    if (grip) {
+      grip.getWorldPosition(hand.position);
+      grip.getWorldQuaternion(hand.quaternion);
+      hand.quaternion.multiply(tmpQ.setFromAxisAngle(RIGHT, 0.5)); // relax wrist
+    } else if (inXR) {
+      hand.position.set(cx, h - 0.8, cz).addScaledVector(right, s * 0.28).addScaledVector(fwd, -0.02);
+      hand.quaternion.copy(yawQ);
+    } else {
+      const bob = Math.sin(phase * 2) * 0.012 * (amp / 0.3 || 0), sway = Math.sin(t * 1.6 + s) * 0.004;
+      tmp2.set(s * 0.23, -0.36 + bob + sway, -0.55 - Math.sin(phase + (s < 0 ? 0 : Math.PI)) * amp * 0.25);
+      camera.localToWorld(hand.position.copy(tmp2));
+      hand.quaternion.copy(headQ).multiply(tmpQ.setFromEuler(new THREE.Euler(-0.35, -s * 0.2, 0)));
+    }
+    shoulderP.set(cx, shY, cz).addScaledVector(right, s * 0.19);
+    wrist.copy(hand.position);
+    pole.set(0, -1, 0).addScaledVector(right, s * 0.5).addScaledVector(fwd, -0.35);
+    ik(shoulderP, wrist, 0.29, 0.27, pole, elbowP);
+    shoulder[name].position.copy(shoulderP);
+    elbow[name].position.copy(elbowP);
+    setLimb(upperArm[name], shoulderP, elbowP, 0.045, 0.045);
+    setLimb(foreArm[name], elbowP, wrist, 0.036, 0.036);
+  }
+}
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+
+  if (!inXR) {
+    if (gyro) {
+      gyroQuat(gQ);
+      camera.quaternion.setFromAxisAngle(UP, yaw).multiply(gQ);
+    } else {
+      camera.rotation.set(pitch, yaw, 0);
+    }
+  }
+  player.updateMatrixWorld(true);
+  camera.getWorldDirection(dir);
+  if (Math.hypot(dir.x, dir.z) > 0.35) headYaw = Math.atan2(-dir.x, -dir.z);
+
+  locomotion(dt);
+  constrain();
+  player.updateMatrixWorld(true);
+  updateAvatar(dt, t);
+
+  camera.getWorldPosition(sky.position);
+  for (const [i, g] of gems.entries()) { g.rotation.y = t * 0.8 + i; g.position.y = 6 + Math.sin(t + i) * 0.25; }
+  for (const b of balloons) {
+    const u = b.userData;
+    b.position.set(u.x + Math.sin(t * 0.6 + u.t) * 0.12, u.y + Math.sin(t * 0.9 + u.t) * 0.12, u.z);
+  }
+  knot.rotation.x = t * 0.6; knot.rotation.y = t * 0.9;
+
+  renderer.render(scene, camera);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// small hook for automated screenshots / debugging
+window.vrWorld = { setView(x, z, newYaw, newPitch) { player.position.set(x, 0, z); yaw = newYaw; pitch = newPitch; } };
+</script>
+</body>
+</html>
